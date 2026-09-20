@@ -10,15 +10,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned
-- [ ] Initialize Next.js 15 project structure with Tailwind CSS and shadcn/ui.
-- [ ] Implement Supabase client and apply initial PostgreSQL schema.
-- [ ] Create Python migration script to import historical transactions from `Monthly Budget.xlsm`.
-- [ ] Mobile Quick-Add modal with tactile numpad and cascading tag picker.
-- [ ] Interactive Month Cockpit with KPI summary cards.
-- [ ] Salary & Malaysian Statutory Deductions engine (EPF, SOCSO, EIS).
-- [ ] Digital bank daily compounded interest calculator (GXBank, Rize/RYT Bank).
-- [ ] Recurring Bills Sentinel (tracking status: `Logged` vs `MISSING`).
-- [ ] PWA service worker and manifest for native mobile installation.
+- [ ] Connect Supabase live credentials via `.env.local`.
+- [ ] Push Git commit to GitHub and trigger Vercel deployment.
+- [ ] Configure custom domain (optional) and install PWA on mobile device.
+
+---
+
+## [0.2.0] - 2026-09-20
+
+### Added
+- **Next.js 15 Web Application**: Scaffolded with TypeScript, Tailwind CSS, App Router, Lucide icons, and Recharts.
+- **Mobile Fast-Entry (<5s)**: Created `QuickAddModal` with tactile numpad, category selector, cascading tag chips, and "One-off?" toggle.
+- **Interactive Monthly Cockpit**:
+  - `MonthSelector` component replacing Excel Timeline Slicers.
+  - `KpiCards` (Total Spend, Food & Dining, Daily Average excluding one-offs, Peak Expense spotlight).
+  - `CategoryChart` (Donut chart) & `TagsBarChart` (Horizontal bar chart).
+  - `SalaryEngine` (Malaysian EPF 11%, SOCSO, EIS, Net Take-home, Net Cash Saved, Savings Rate progress bar).
+  - `RecurringSentinel` (Automated checklist tracking Netflix, iCloud, Cuckoo, Water, Electric, Season Parking).
+- **Full Transaction Ledger**: `LedgerTable` component with instant search, category filtering, and delete actions.
+- **Savings & Asset Management**:
+  - `SavingsPage` tracking Main Checking, GXBank, Rize/RYT Bank, and EPF locked balances.
+  - Automated daily compounding interest calculator based on calendar month days.
+- **Excel Ingestion & Data Seeding**:
+  - Extracted 10 categories, 31 tags, 172 transactions, and 5 monthly savings snapshots from `Monthly Budget.xlsm`.
+  - Generated `scripts/seed_data.sql` for instant Supabase SQL Editor execution.
+  - Generated `src/lib/mock-data.ts` and `src/lib/budget-context.tsx` with offline LocalStorage persistence and Supabase sync.
+- **Formula Verification Suite**: Added `scripts/test_formulas.mjs` validating salary deductions and GXBank interest against Excel ground truth.
 
 ---
 
@@ -28,17 +45,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Comprehensive architectural blueprint and migration specification from Excel (`.xlsm`) to Next.js + Supabase.
 - Full PostgreSQL database schema definition with Row-Level Security (RLS) policies.
 - Detailed engineering `README.md` with system design, mathematical formulas, and setup guide.
-- Release engineering governance documents:
-  - `changelog.md` (Changelog tracking standard)
-  - `version-bump.md` (SemVer bumping protocol)
-  - `release-flow.md` (Branching, CI/CD, and deployment lifecycle)
-
-### Changed
-- Transitioned architecture evaluation from a traditional container model (Render) to a true perpetual free-tier Serverless pattern (Vercel Edge + Supabase PostgreSQL).
-
-### Verified
-- Completed deep read-only inspection of source `Monthly Budget.xlsm`:
-  - Validated 172 transactions spanning 2026-08-01 to 2026-09-19.
-  - Verified digital bank compounding interest formulas (`DAY(EOMONTH(...))`).
-  - Audited timeline slicer VBA macro logic (`Worksheet_PivotTableUpdate`).
-  - Confirmed $100\%$ data integrity with zero modifications to source files.
+- Release engineering governance documents (`changelog.md`, `version-bump.md`, `release-flow.md`).

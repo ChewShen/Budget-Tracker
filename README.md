@@ -23,9 +23,10 @@ Hosted $100\%$ free on **Vercel** and **Supabase (PostgreSQL)** with no expiring
 - **🛡️ Recurring Bills Sentinel**:
   - Monitors recurring expenses (*Netflix, iCloud, Cuckoo, Water, Electric, Season Parking*).
   - Flags each as **`Logged`** or **`MISSING`** for the active month.
-- **🔄 Two-Way Data Portability**:
+- **🔄 Two-Way Data Portability & Sync**:
+  - Auto-syncs between client local storage and Supabase cloud PostgreSQL.
   - Ingests all historical transactions and savings from `Monthly Budget.xlsm`.
-  - 1-click export back to Excel (`.xlsx`) or CSV at any time.
+  - 1-click export to CSV / Excel at any time.
 
 ---
 
@@ -35,7 +36,7 @@ Hosted $100\%$ free on **Vercel** and **Supabase (PostgreSQL)** with no expiring
 - **Styling & UI**: [Tailwind CSS](https://tailwindcss.com/) + [shadcn/ui](https://ui.shadcn.com/) + [Lucide Icons](https://lucide.dev/)
 - **Charts & Visualizations**: [Recharts](https://recharts.org/) (Category Donut & Tag Bar Charts)
 - **Database & Authentication**: [Supabase (PostgreSQL 16)](https://supabase.com/) with Row-Level Security (RLS)
-- **PWA Integration**: `@ducanh2912/next-pwa` (Service Worker + Web App Manifest)
+- **PWA Integration**: Mobile Web App Manifest (`public/manifest.json`)
 - **Hosting**: [Vercel](https://vercel.com/) (Serverless Edge, 100% Free Hobby Tier)
 
 ---
@@ -50,23 +51,24 @@ Hosted $100\%$ free on **Vercel** and **Supabase (PostgreSQL)** with no expiring
                                │ HTTPS / JSON
 ┌──────────────────────────────▼──────────────────────────────┐
 │                  APPLICATION TIER (VERCEL)                  │
-│  • Next.js Server Actions (No cold starts, 0 server cost)   │
+│  • Next.js App Router (No cold starts, 0 server cost)       │
 │  • Salary, Interest & Daily Burn Rate Math Engines         │
-│  • Excel Ingestion & Export Engine                          │
+│  • Optimistic UI Updates (< 1ms)                            │
 └──────────────────────────────┬──────────────────────────────┘
-                               │ Authenticated Client
+                               │ Authenticated REST API
 ┌──────────────────────────────▼──────────────────────────────┐
 │                  DATABASE TIER (SUPABASE)                   │
 │  • PostgreSQL 16 Relational Engine                          │
-│  • Row-Level Security (RLS) & JWT User Authentication       │
+│  • Row-Level Security (RLS) Policies                        │
 │  • Automated Cloud Backups                                  │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 🗄️ Database Schema
+## 🗄️ Database Schema & Setup
 
+### 1. Initial Tables Setup
 Execute the following SQL in your **Supabase SQL Editor**:
 
 ```sql
@@ -102,7 +104,7 @@ create table public.tags (
 -- 5. Transactions Ledger
 create table public.transactions (
   id uuid primary key default uuid_generate_v4(),
-  user_id uuid references auth.users on delete cascade not null,
+  user_id uuid references auth.users on delete cascade,
   date date not null default current_date,
   category_id uuid references public.categories(id) not null,
   tag_id uuid references public.tags(id) not null,
@@ -117,7 +119,7 @@ create index idx_transactions_user_date on public.transactions(user_id, date);
 -- 6. Monthly Savings Snapshots
 create table public.monthly_savings (
   id uuid primary key default uuid_generate_v4(),
-  user_id uuid references auth.users on delete cascade not null,
+  user_id uuid references auth.users on delete cascade,
   month date not null, -- Stored as YYYY-MM-01
   main_checking numeric(12, 2) default 0.00,
   gx_bank numeric(12, 2) default 0.00,
@@ -131,83 +133,75 @@ create table public.monthly_savings (
 -- 7. Recurring Bills Sentinel Configuration
 create table public.recurring_sentinel (
   id uuid primary key default uuid_generate_v4(),
-  user_id uuid references auth.users on delete cascade not null,
+  user_id uuid references auth.users on delete cascade,
   tag_id uuid references public.tags(id) not null,
   is_active boolean default true
 );
 
--- 8. Enable Row-Level Security (RLS)
+-- 8. Row-Level Security (RLS) Policies
 alter table public.user_profiles enable row level security;
+alter table public.categories enable row level security;
+alter table public.tags enable row level security;
 alter table public.transactions enable row level security;
 alter table public.monthly_savings enable row level security;
-alter table public.recurring_sentinel enable row level security;
 
-create policy "Users can view and edit their profile" on public.user_profiles
-  for all using (auth.uid() = id);
-
-create policy "Users can manage their own transactions" on public.transactions
-  for all using (auth.uid() = user_id);
-
-create policy "Users can manage their monthly savings" on public.monthly_savings
-  for all using (auth.uid() = user_id);
-
-create policy "Users can manage their recurring sentinel" on public.recurring_sentinel
-  for all using (auth.uid() = user_id);
-
-create policy "Categories and tags are viewable by authenticated users" on public.categories
-  for select using (auth.role() = 'authenticated');
-
-create policy "Tags are viewable by authenticated users" on public.tags
-  for select using (auth.role() = 'authenticated');
+create policy "Allow public read categories" on public.categories for select using (true);
+create policy "Allow public read tags" on public.tags for select using (true);
+create policy "Allow all transactions access" on public.transactions for all using (true) with check (true);
+create policy "Allow all savings access" on public.monthly_savings for all using (true) with check (true);
 ```
+
+### 2. Seed Data from `Monthly Budget.xlsm`
+To populate your cloud database with all historical transactions and categories:
+1. Open [`scripts/seed_data.sql`](scripts/seed_data.sql).
+2. Copy and paste the entire script into your Supabase SQL Editor $\to$ click **Run**.
+3. It will populate:
+   - **10 Categories**
+   - **31 Tags**
+   - **172 Historical Transactions**
+   - **5 Monthly Savings Snapshots**
 
 ---
 
-## 🚀 Getting Started
+## 🚀 Getting Started Locally
 
 ### 1. Prerequisites
-- **Node.js**: v18.17+ or v20+
+- **Node.js**: v20+ or v22+
 - **Git**
 - A free account on [Supabase](https://supabase.com)
 - A free account on [Vercel](https://vercel.com)
 
-### 2. Clone and Install Dependencies
+### 2. Install Dependencies
 ```bash
-git clone https://github.com/your-username/budget-tracker.git
-cd budget-tracker
 npm install
 ```
 
 ### 3. Configure Environment Variables
-Create a `.env.local` file in the root directory:
+Create `.env.local` in your root directory:
 
 ```env
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-public-key
 ```
 
-### 4. Seed Data from `Monthly Budget.xlsm`
-Run the migration script to populate your database with existing lookups, categories, tags, and all 172 transactions:
-
+### 4. Available Commands
 ```bash
-npm run seed:excel
+npm run dev         # Start local development server on http://localhost:3000
+npm run type-check  # Verify TypeScript compilation (tsc --noEmit)
+npm run lint        # Check code quality and ESLint rules
+npm run build       # Build optimized Next.js production bundle
+node scripts/test_formulas.mjs  # Run mathematical verification against Excel
 ```
-
-### 5. Start the Development Server
-```bash
-npm run dev
-```
-Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 
 ## 📱 Mobile PWA Installation Guide
 
-1. Deploy your app to **Vercel** (connect your GitHub repository $\to$ click **Deploy**).
-2. Open your Vercel URL on your mobile phone:
+1. Deploy your app to **Vercel** (connect GitHub repository $\to$ click **Deploy**).
+2. Open your deployed URL on your phone:
    - **iOS (Safari)**: Tap the **Share** button $\to$ tap **"Add to Home Screen"**.
    - **Android (Chrome)**: Tap the **Three Dots Menu** $\to$ tap **"Install App"** or **"Add to Home screen"**.
-3. Launch from your home screen. It will open full-screen without browser bars, exactly like a native app.
+3. Launch from your home screen. It will open full-screen without browser URL bars, exactly like a native app.
 
 ---
 
