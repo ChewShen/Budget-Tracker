@@ -8,6 +8,7 @@ Hosted $100\%$ free on **Vercel** and **Supabase (PostgreSQL)** with no expiring
 
 ## 📱 Highlights & Features
 
+- **🎨 Fintech Brand Theme**: Styled with electric **Lime Spark (`#B6FF2E`)** and deep **Graphite (`#23262F`)** for a sleek, high-contrast neobank visual experience.
 - **⚡ 5-Second Mobile Quick-Add (PWA)**: Large tactile numpad, category-to-tag cascading picker, and "One-off?" toggle. Installable directly to iOS/Android home screens.
 - **📊 Dynamic Monthly Cockpit**: Replaces Excel Timeline Slicers with a responsive month selector that recalculates KPIs in real time:
   - **Total Spend & Food Burn Rate**
