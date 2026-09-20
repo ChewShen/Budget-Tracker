@@ -9,8 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Fintech Brand Redesign**: Redesigned app aesthetic to electric **Lime Spark (`#B6FF2E`)** and deep **Graphite (`#23262F`)** with high-contrast typography, neon chart highlights, and updated mobile PWA theme bars.
+
 ### Planned
-- [ ] Connect Supabase live credentials via `.env.local`.
 - [ ] Push Git commit to GitHub and trigger Vercel deployment.
 - [ ] Configure custom domain (optional) and install PWA on mobile device.
 

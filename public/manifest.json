@@ -4,8 +4,8 @@
   "description": "Personal budget, wealth and recurring bills tracker",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#2563eb",
+  "background_color": "#23262F",
+  "theme_color": "#23262F",
   "icons": [
     {
       "src": "/icon-192.png",
