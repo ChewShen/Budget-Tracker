@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Calendar, Tag, Layers, Check, Sparkles } from "lucide-react";
+import { X, Delete } from "lucide-react";
+import { categoryIcon, categoryLabel } from "@/lib/categories";
 import { format } from "date-fns";
 
 interface QuickAddModalProps {
@@ -57,6 +58,13 @@ export function QuickAddModal({
     }
   }, [selectedCategoryId, availableTags, selectedTagId]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const handleNumpad = (digit: string) => {
@@ -97,158 +105,153 @@ export function QuickAddModal({
     }
   };
 
+  const amountDisplay = amountStr || "0";
+
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4">
-      <div className="w-full max-w-lg rounded-t-2xl sm:rounded-2xl border bg-card p-5 shadow-2xl animate-in fade-in slide-in-from-bottom duration-200">
-        {/* Header */}
-        <div className="flex items-center justify-between pb-3 border-b">
-          <div className="flex items-center gap-2">
-            <span className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground font-black text-xs">
-              RM
-            </span>
-            <h2 className="font-bold text-lg text-foreground">Quick Add Expense</h2>
-          </div>
+    <div
+      className="fixed inset-0 z-50 flex animate-fade-in items-end justify-center bg-black/70 backdrop-blur-sm sm:items-center sm:p-4"
+      onClick={onClose}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Add expense"
+        onClick={(e) => e.stopPropagation()}
+        className="max-h-[92dvh] w-full max-w-md animate-sheet-up overflow-y-auto rounded-t-3xl border bg-card px-5 pb-safe pt-3 shadow-2xl sm:rounded-3xl sm:pb-5"
+      >
+        {/* Grabber (mobile) */}
+        <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-border sm:hidden" />
+
+        <div className="flex items-center justify-between">
+          <h2 className="text-[15px] font-semibold">Add expense</h2>
           <button
             onClick={onClose}
-            className="rounded-full p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+            className="-mr-1.5 rounded-full p-2 text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+            aria-label="Close"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
-          {/* Amount Display */}
-          <div className="flex flex-col items-center justify-center rounded-xl bg-muted/40 p-4">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Amount (MYR)
-            </span>
-            <div className="mt-1 flex items-baseline gap-1">
-              <span className="text-2xl font-bold text-muted-foreground">RM</span>
-              <input
-                type="text"
-                readOnly
-                value={amountStr || "0.00"}
-                className="w-48 bg-transparent text-center text-4xl font-black tracking-tight text-foreground outline-none"
-              />
+        <form onSubmit={handleSubmit} className="mt-2 space-y-5 pb-5">
+          {/* Amount */}
+          <div className="py-3 text-center">
+            <div className="flex items-baseline justify-center gap-2">
+              <span className="text-xl font-medium text-muted-foreground">RM</span>
+              <span
+                className={`text-5xl font-semibold tracking-tight tabular-nums ${
+                  amountStr ? "text-foreground" : "text-muted-foreground/50"
+                }`}
+                aria-live="polite"
+              >
+                {amountDisplay}
+              </span>
             </div>
           </div>
 
-          {/* Quick Numpad */}
-          <div className="grid grid-cols-3 gap-2">
-            {["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "DEL"].map(
-              (key) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => (key === "DEL" ? handleBackspace() : handleNumpad(key))}
-                  className="flex h-11 items-center justify-center rounded-lg border bg-background font-bold text-lg text-foreground shadow-xs transition hover:bg-muted active:scale-95"
-                >
-                  {key}
-                </button>
-              )
-            )}
-          </div>
-
-          {/* Category Chips */}
-          <div>
-            <label className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground mb-1.5">
-              <Layers className="h-3.5 w-3.5" />
-              Category
-            </label>
-            <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-              {categories.map((cat) => (
+          {/* Category */}
+          <div className="-mx-5 flex gap-1.5 overflow-x-auto px-5 scrollbar-none">
+            {categories.map((cat) => {
+              const Icon = categoryIcon(cat.name);
+              const isActive = selectedCategoryId === cat.id;
+              return (
                 <button
                   key={cat.id}
                   type="button"
                   onClick={() => setSelectedCategoryId(cat.id)}
-                  className={`rounded-full px-3 py-1 text-xs font-semibold whitespace-nowrap transition ${
-                    selectedCategoryId === cat.id
-                      ? "bg-primary text-primary-foreground shadow-xs"
-                      : "border bg-background text-muted-foreground hover:bg-muted"
+                  className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition ${
+                    isActive
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-secondary text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  {cat.name}
+                  <Icon className="h-3.5 w-3.5" />
+                  {categoryLabel(cat.name)}
                 </button>
-              ))}
-            </div>
+              );
+            })}
           </div>
 
-          {/* Tag Chips (Cascading based on Category) */}
-          <div>
-            <label className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground mb-1.5">
-              <Tag className="h-3.5 w-3.5" />
-              Tag / Sub-category
-            </label>
-            <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
-              {availableTags.map((tag) => (
-                <button
-                  key={tag.id}
-                  type="button"
-                  onClick={() => setSelectedTagId(tag.id)}
-                  className={`rounded-lg px-2.5 py-1 text-xs font-medium transition ${
-                    selectedTagId === tag.id
-                      ? "bg-secondary text-foreground border border-primary font-bold shadow-xs"
-                      : "border bg-background text-muted-foreground hover:bg-muted"
-                  }`}
-                >
-                  {tag.name}
-                </button>
-              ))}
-            </div>
+          {/* Tags */}
+          <div className="flex max-h-[4.75rem] flex-wrap gap-1.5 overflow-y-auto">
+            {availableTags.map((tag) => (
+              <button
+                key={tag.id}
+                type="button"
+                onClick={() => setSelectedTagId(tag.id)}
+                className={`rounded-lg border px-2.5 py-1 text-xs font-medium transition ${
+                  selectedTagId === tag.id
+                    ? "border-foreground/80 text-foreground"
+                    : "border-border text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {tag.name}
+              </button>
+            ))}
           </div>
 
-          {/* Date & One-Off Flag Row */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground mb-1">
-                <Calendar className="h-3.5 w-3.5" /> Date
-              </label>
+          {/* Note, date, one-off */}
+          <div className="space-y-2">
+            <input
+              type="text"
+              placeholder="Add a note"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="field"
+            />
+            <div className="grid grid-cols-2 gap-2">
               <input
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
-                className="w-full rounded-lg border bg-background px-3 py-1.5 text-xs font-medium text-foreground outline-none focus:ring-1 focus:ring-primary"
+                className="field"
+                aria-label="Date"
               />
-            </div>
-
-            <div className="flex flex-col justify-end">
-              <label className="flex items-center gap-2 cursor-pointer rounded-lg border bg-background p-2 text-xs font-medium">
-                <input
-                  type="checkbox"
-                  checked={isOneOff}
-                  onChange={(e) => setIsOneOff(e.target.checked)}
-                  className="h-4 w-4 rounded text-primary focus:ring-primary"
-                />
-                <span>One-off expense?</span>
-              </label>
+              <button
+                type="button"
+                onClick={() => setIsOneOff((v) => !v)}
+                aria-pressed={isOneOff}
+                className={`flex items-center justify-between rounded-xl border px-3.5 text-sm transition ${
+                  isOneOff ? "border-foreground/80 text-foreground" : "border-input text-muted-foreground"
+                }`}
+              >
+                One-off
+                <span
+                  className={`relative h-5 w-9 rounded-full transition ${
+                    isOneOff ? "bg-primary" : "bg-secondary"
+                  }`}
+                >
+                  <span
+                    className={`absolute top-0.5 h-4 w-4 rounded-full bg-background shadow transition-all ${
+                      isOneOff ? "left-[18px]" : "left-0.5"
+                    }`}
+                  />
+                </span>
+              </button>
             </div>
           </div>
 
-          {/* Description Input */}
-          <div>
-            <input
-              type="text"
-              placeholder="Description / note (optional)"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="w-full rounded-lg border bg-background px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:ring-1 focus:ring-primary"
-            />
+          {/* Numpad */}
+          <div className="grid grid-cols-3 gap-1.5">
+            {["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "DEL"].map((key) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => (key === "DEL" ? handleBackspace() : handleNumpad(key))}
+                className="flex h-12 items-center justify-center rounded-xl text-xl font-medium transition hover:bg-secondary active:scale-95 active:bg-secondary"
+                aria-label={key === "DEL" ? "Delete digit" : key}
+              >
+                {key === "DEL" ? <Delete className="h-5 w-5" /> : key}
+              </button>
+            ))}
           </div>
 
-          {/* Submit Button */}
           <button
             type="submit"
             disabled={!parseFloat(amountStr) || isSubmitting}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 font-bold text-sm text-primary-foreground shadow-md transition hover:bg-primary/90 disabled:opacity-50 active:scale-98"
+            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-primary text-sm font-semibold text-primary-foreground transition hover:brightness-95 active:scale-[0.98] disabled:opacity-40"
           >
-            {isSubmitting ? (
-              <span>Saving...</span>
-            ) : (
-              <>
-                <Check className="h-4 w-4 stroke-[3]" />
-                <span>Save Expense</span>
-              </>
-            )}
+            {isSubmitting ? "Saving…" : "Save expense"}
           </button>
         </form>
       </div>

@@ -11,10 +11,10 @@ function ShellInner({ children }: { children: React.ReactNode }) {
   const { categories, tags, addTransaction } = useBudget();
 
   return (
-    <div className="min-h-screen bg-background text-foreground pb-20 md:pb-10 flex flex-col">
+    <div className="min-h-screen bg-background text-foreground pb-28 md:pb-12 flex flex-col">
       <Navbar onOpenQuickAdd={() => setIsQuickAddOpen(true)} />
 
-      <main className="flex-1 container mx-auto max-w-7xl px-4 sm:px-6 py-6">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 sm:px-6 py-6 sm:py-8">
         {children}
       </main>
 

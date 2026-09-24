@@ -1,4 +1,3 @@
-import { Wallet, ShieldCheck, ArrowDownRight, Percent } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 
 interface SalaryEngineProps {
@@ -12,6 +11,33 @@ interface SalaryEngineProps {
   onGrossChange?: (newGross: number) => void;
 }
 
+function Line({
+  label,
+  value,
+  tone = "default",
+  strong = false,
+}: {
+  label: string;
+  value: string;
+  tone?: "default" | "muted";
+  strong?: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between py-2 text-sm">
+      <span className={tone === "muted" ? "text-muted-foreground" : strong ? "font-medium" : ""}>
+        {label}
+      </span>
+      <span
+        className={`tabular-nums ${tone === "muted" ? "text-muted-foreground" : ""} ${
+          strong ? "font-semibold" : ""
+        }`}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
+
 export function SalaryEngine({
   gross,
   epf,
@@ -21,105 +47,67 @@ export function SalaryEngine({
   netCashSaved,
   savingsRate,
 }: SalaryEngineProps) {
+  const totalSpend = netSalary - netCashSaved;
   const isPositiveSavings = netCashSaved >= 0;
+  const TARGET = 20;
 
   return (
-    <div className="rounded-xl border bg-card p-5 shadow-sm">
-      <div className="flex items-center justify-between border-b pb-3">
-        <div className="flex items-center gap-2">
-          <Wallet className="h-5 w-5 text-primary" />
-          <h3 className="font-bold text-base text-foreground">
-            Salary & Cash Flow Engine
-          </h3>
+    <section className="card p-5 sm:p-6">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-[15px] font-semibold">Cash flow</h3>
+          <p className="mt-0.5 text-xs text-muted-foreground">Salary after EPF, SOCSO and EIS</p>
         </div>
-        <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
-          MY Statutory Rates
-        </span>
-      </div>
-
-      <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
-        {/* Gross Salary */}
-        <div className="rounded-lg bg-muted/50 p-3">
-          <div className="text-xs text-muted-foreground font-medium">GROSS SALARY</div>
-          <div className="mt-1 text-lg font-bold">{formatCurrency(gross)}</div>
-          <div className="text-[11px] text-muted-foreground">Base income</div>
-        </div>
-
-        {/* Deductions Breakdown */}
-        <div className="rounded-lg bg-muted/50 p-3">
-          <div className="text-xs text-muted-foreground font-medium">DEDUCTIONS</div>
-          <div className="mt-1 text-lg font-bold text-red-600">
-            -{formatCurrency(epf + socso + eis)}
-          </div>
-          <div className="text-[11px] text-muted-foreground">
-            EPF: {formatCurrency(epf)} | SOCSO: {formatCurrency(socso)} | EIS: {formatCurrency(eis)}
-          </div>
-        </div>
-
-        {/* Net Salary */}
-        <div className="rounded-lg bg-muted/50 p-3">
-          <div className="text-xs text-muted-foreground font-medium">NET SALARY</div>
-          <div className="mt-1 text-lg font-bold text-foreground">
-            {formatCurrency(netSalary)}
-          </div>
-          <div className="text-[11px] text-muted-foreground">Take-home pay</div>
-        </div>
-
-        {/* Net Cash Saved */}
-        <div className="rounded-lg bg-muted/50 p-3">
-          <div className="text-xs text-muted-foreground font-medium">NET CASH SAVED</div>
+        <div className="text-right">
+          <div className="eyebrow">Saved</div>
           <div
-            className={`mt-1 text-lg font-bold ${
-              isPositiveSavings ? "text-emerald-600" : "text-red-600"
+            className={`text-xl font-semibold tracking-tight ${
+              isPositiveSavings ? "text-success" : "text-danger"
             }`}
           >
             {formatCurrency(netCashSaved)}
           </div>
-          <div className="text-[11px] text-muted-foreground">
-            Net Salary minus Total Spend
-          </div>
         </div>
       </div>
 
-      {/* Savings Rate Progress Gauge */}
-      <div className="mt-5 rounded-lg border bg-background p-3">
-        <div className="flex items-center justify-between text-sm">
-          <span className="flex items-center gap-1.5 font-medium text-muted-foreground">
-            <Percent className="h-4 w-4 text-primary" />
-            Monthly Savings Rate
-          </span>
-          <span
-            className={`font-black text-base ${
-              savingsRate >= 20
-                ? "text-emerald-600"
-                : savingsRate > 0
-                ? "text-blue-600"
-                : "text-red-600"
-            }`}
-          >
-            {savingsRate.toFixed(1)}%
-          </span>
+      <div className="mt-4 divide-y divide-border/70">
+        <Line label="Gross salary" value={formatCurrency(gross)} />
+        <div>
+          <Line label="EPF (11%)" value={`−${formatCurrency(epf)}`} tone="muted" />
+          <Line label="SOCSO" value={`−${formatCurrency(socso)}`} tone="muted" />
+          <Line label="EIS" value={`−${formatCurrency(eis)}`} tone="muted" />
         </div>
+        <Line label="Take-home" value={formatCurrency(netSalary)} strong />
+        <Line label="Spent this month" value={`−${formatCurrency(totalSpend)}`} tone="muted" />
+      </div>
 
-        {/* Progress Bar */}
-        <div className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-muted">
+      {/* Savings rate with target marker */}
+      <div className="mt-4 rounded-xl bg-secondary/60 p-4">
+        <div className="flex items-baseline justify-between text-sm">
+          <span className="text-muted-foreground">Savings rate</span>
+          <span className="font-semibold tabular-nums">{savingsRate.toFixed(1)}%</span>
+        </div>
+        <div className="relative mt-3 h-2 w-full rounded-full bg-background">
           <div
-            className={`h-full transition-all duration-500 rounded-full ${
-              savingsRate >= 20
-                ? "bg-primary"
-                : savingsRate > 0
-                ? "bg-primary/80"
-                : "bg-red-500"
+            className={`h-full rounded-full transition-all duration-500 ${
+              savingsRate >= 0 ? "bg-primary" : "bg-danger"
             }`}
-            style={{ width: `${Math.min(100, Math.max(0, savingsRate))}%` }}
+            style={{ width: `${Math.min(100, Math.max(0, (savingsRate / 50) * 100))}%` }}
+          />
+          <div
+            className="absolute -top-1 h-4 w-0.5 rounded-full bg-foreground/60"
+            style={{ left: `${(TARGET / 50) * 100}%` }}
+            aria-hidden
           />
         </div>
-        <div className="mt-1.5 flex justify-between text-[11px] text-muted-foreground">
-          <span>0%</span>
-          <span>Target: 20%+</span>
-          <span>50%</span>
+        <div className="relative mt-1.5 h-4 text-[11px] text-muted-foreground">
+          <span className="absolute left-0">0%</span>
+          <span className="absolute -translate-x-1/2" style={{ left: `${(TARGET / 50) * 100}%` }}>
+            Target {TARGET}%
+          </span>
+          <span className="absolute right-0">50%</span>
         </div>
       </div>
-    </div>
+    </section>
   );
 }
