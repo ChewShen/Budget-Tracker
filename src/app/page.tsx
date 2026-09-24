@@ -28,16 +28,16 @@ const RECURRING_TAGS = [
 ];
 
 const CATEGORY_COLORS: Record<string, string> = {
-  Food: "#f97316",
+  Food: "#B6FF2E",
   Transport: "#06b6d4",
   Home_Bills: "#3b82f6",
   Self_care: "#ec4899",
-  Subscription: "#8b5cf6",
+  Subscription: "#a855f7",
   Health: "#ef4444",
   Own_Interest: "#eab308",
-  Entertainment: "#a855f7",
+  Entertainment: "#f97316",
   Shopping: "#10b981",
-  Others: "#6b7280",
+  Others: "#777E90",
 };
 
 export default function DashboardPage() {

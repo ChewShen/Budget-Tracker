@@ -1,7 +1,7 @@
 import type { Config } from "tailwindcss";
 
 export default {
-  darkMode: ["class"],
+  darkMode: ["class", '[data-theme="dark"]'],
   content: [
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
@@ -10,6 +10,21 @@ export default {
   theme: {
     extend: {
       colors: {
+        // Custom Brand Tokens
+        lime: {
+          DEFAULT: "#B6FF2E",
+          spark: "#B6FF2E",
+          hover: "#A3ED1C",
+          dark: "#84C80A",
+        },
+        graphite: {
+          DEFAULT: "#23262F",
+          darker: "#181A20",
+          card: "#23262F",
+          border: "#353945",
+          muted: "#777E90",
+          light: "#E6E8EC",
+        },
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
         card: {
