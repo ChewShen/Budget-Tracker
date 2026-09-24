@@ -67,7 +67,7 @@ export function TagsBarChart({ data }: TagsBarChartProps) {
               {topTags.map((_, index) => (
                 <Cell
                   key={`tag-bar-${index}`}
-                  fill={index === 0 ? "#8b5cf6" : "#3b82f6"}
+                  fill={index === 0 ? "#B6FF2E" : "#353945"}
                 />
               ))}
             </Bar>
