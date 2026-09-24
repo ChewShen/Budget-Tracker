@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Download, CheckCircle, Database } from "lucide-react";
+import { ArrowRight, Download } from "lucide-react";
+import { format, getDaysInMonth, parse, subMonths } from "date-fns";
 import { useBudget } from "@/lib/budget-context";
 import { MonthSelector } from "@/components/month-selector";
 import { KpiCards } from "@/components/kpi-cards";
+import { SpendHero } from "@/components/spend-hero";
 import { SalaryEngine } from "@/components/salary-engine";
 import { RecurringSentinel } from "@/components/recurring-sentinel";
 import { CategoryChart } from "@/components/category-chart";
@@ -27,18 +29,6 @@ const RECURRING_TAGS = [
   "Season Parking",
 ];
 
-const CATEGORY_COLORS: Record<string, string> = {
-  Food: "#B6FF2E",
-  Transport: "#06b6d4",
-  Home_Bills: "#3b82f6",
-  Self_care: "#ec4899",
-  Subscription: "#a855f7",
-  Health: "#ef4444",
-  Own_Interest: "#eab308",
-  Entertainment: "#f97316",
-  Shopping: "#10b981",
-  Others: "#777E90",
-};
 
 export default function DashboardPage() {
   const {
@@ -59,6 +49,22 @@ export default function DashboardPage() {
   const foodSpend = monthTransactions
     .filter((t) => (t.category_name || "").toLowerCase() === "food")
     .reduce((sum, t) => sum + t.amount, 0);
+
+  // 1b. Previous month total & daily series for the hero chart
+  const monthDate = parse(`${selectedMonth}-01`, "yyyy-MM-dd", new Date());
+  const monthLabel = format(monthDate, "MMMM");
+  const previousMonth = format(subMonths(monthDate, 1), "yyyy-MM");
+  const previousSpend = transactions
+    .filter((t) => t.date.startsWith(previousMonth))
+    .reduce((sum, t) => sum + t.amount, 0);
+  const dailySeries = Array.from({ length: getDaysInMonth(monthDate) }, (_, i) => ({
+    day: i + 1,
+    amount: 0,
+  }));
+  monthTransactions.forEach((t) => {
+    const day = Number(t.date.slice(8, 10));
+    if (dailySeries[day - 1]) dailySeries[day - 1].amount += t.amount;
+  });
 
   // 2. Daily Average (excluding one-off)
   const dailyAverage = calculateDailyAverage(
@@ -91,7 +97,6 @@ export default function DashboardPage() {
     .map(([name, value]) => ({
       name,
       value: Math.round(value * 100) / 100,
-      color: CATEGORY_COLORS[name] || "#6b7280",
     }))
     .sort((a, b) => b.value - a.value);
 
@@ -138,86 +143,88 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Top Header Controls */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-4 sm:space-y-5">
+      {/* Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <MonthSelector
           currentMonth={selectedMonth}
           onChangeMonth={setSelectedMonth}
         />
 
-        <div className="flex items-center gap-2 self-end sm:self-auto">
-          {isSyncedWithSupabase ? (
-            <span className="flex items-center gap-1.5 rounded-full bg-emerald-100 dark:bg-emerald-950 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
-              <Database className="h-3 w-3" />
-              Supabase Connected
-            </span>
-          ) : (
-            <span className="flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
-              <CheckCircle className="h-3 w-3 text-primary" />
-              Local Storage Mode
-            </span>
-          )}
-
+        <div className="flex items-center gap-1">
+          <span
+            className="flex items-center gap-1.5 px-2 text-xs text-muted-foreground"
+            title={isSyncedWithSupabase ? "Synced with Supabase" : "Saved on this device only"}
+          >
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${
+                isSyncedWithSupabase ? "bg-success" : "bg-muted-foreground"
+              }`}
+            />
+            {isSyncedWithSupabase ? "Synced" : "Local only"}
+          </span>
           <button
             onClick={handleExportCsv}
-            className="flex items-center gap-1.5 rounded-lg border bg-card px-3 py-1.5 text-xs font-semibold text-foreground shadow-xs transition hover:bg-muted"
-            title="Export Backup CSV"
+            className="flex h-9 items-center gap-1.5 rounded-full px-3 text-xs font-medium text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+            title="Export all transactions as CSV"
           >
-            <Download className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Export CSV</span>
+            <Download className="h-4 w-4" />
+            <span className="hidden sm:inline">Export</span>
           </button>
         </div>
       </div>
 
-      {/* KPI Cards */}
+      <SpendHero
+        monthLabel={monthLabel}
+        totalSpend={totalSpend}
+        previousSpend={previousSpend}
+        transactionCount={monthTransactions.length}
+        daily={dailySeries}
+      />
+
       <KpiCards
         totalSpend={totalSpend}
         foodSpend={foodSpend}
         dailyAverage={dailyAverage}
         largestExpense={largestExpense}
-        transactionCount={monthTransactions.length}
-      />
-
-      {/* Visual Charts Grid */}
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-        <CategoryChart data={categoryChartData} />
-        <TagsBarChart data={tagChartData} />
-      </div>
-
-      {/* Salary & Deductions Engine */}
-      <SalaryEngine
-        gross={salaryMetrics.gross}
-        epf={salaryMetrics.epf}
-        socso={salaryMetrics.socso}
-        eis={salaryMetrics.eis}
-        netSalary={salaryMetrics.netSalary}
-        netCashSaved={salaryMetrics.netCashSaved}
         savingsRate={salaryMetrics.savingsRate}
       />
 
-      {/* Monthly Recurring Bills Sentinel */}
-      <RecurringSentinel items={recurringStatus} />
+      <div className="grid grid-cols-1 gap-4 sm:gap-5 lg:grid-cols-2">
+        <CategoryChart data={categoryChartData} />
+        <TagsBarChart data={tagChartData} />
+        <SalaryEngine
+          gross={salaryMetrics.gross}
+          epf={salaryMetrics.epf}
+          socso={salaryMetrics.socso}
+          eis={salaryMetrics.eis}
+          netSalary={salaryMetrics.netSalary}
+          netCashSaved={salaryMetrics.netCashSaved}
+          savingsRate={salaryMetrics.savingsRate}
+        />
+        <RecurringSentinel items={recurringStatus} />
+      </div>
 
-      {/* Recent Transactions Snippet */}
-      <div className="space-y-3">
+      {/* Recent transactions */}
+      <section className="space-y-3 pt-2">
         <div className="flex items-center justify-between">
-          <h3 className="font-bold text-base text-foreground">
-            Transactions ({monthTransactions.length})
-          </h3>
+          <h3 className="text-[15px] font-semibold">Recent</h3>
           <Link
             href="/transactions"
-            className="flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+            className="flex items-center gap-1 text-xs font-medium text-muted-foreground transition hover:text-foreground"
           >
-            Open Full Ledger <ArrowRight className="h-3.5 w-3.5" />
+            See all <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         </div>
 
         <LedgerTable
-          transactions={monthTransactions.slice(0, 10)}
+          transactions={[...monthTransactions]
+            .sort((a, b) => b.date.localeCompare(a.date))
+            .slice(0, 8)}
           onDeleteTransaction={deleteTransaction}
+          showFilters={false}
         />
-      </div>
+      </section>
     </div>
   );
 }

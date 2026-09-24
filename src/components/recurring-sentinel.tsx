@@ -1,4 +1,4 @@
-import { ShieldAlert, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Check, CircleDashed } from "lucide-react";
 
 interface RecurringItemStatus {
   tag_name: string;
@@ -10,55 +10,48 @@ interface RecurringSentinelProps {
 }
 
 export function RecurringSentinel({ items }: RecurringSentinelProps) {
-  const missingCount = items.filter((i) => !i.isLogged).length;
-  const loggedCount = items.length - missingCount;
+  const loggedCount = items.filter((i) => i.isLogged).length;
+  const missingCount = items.length - loggedCount;
 
   return (
-    <div className="rounded-xl border bg-card p-5 shadow-sm">
-      <div className="flex items-center justify-between border-b pb-3">
-        <div className="flex items-center gap-2">
-          <ShieldAlert className="h-5 w-5 text-purple-600" />
-          <h3 className="font-bold text-base text-foreground">
-            Monthly Bills Sentinel
-          </h3>
+    <section className="card p-5 sm:p-6">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-[15px] font-semibold">Monthly bills</h3>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {missingCount === 0
+              ? "Everything is logged"
+              : `${missingCount} not logged yet`}
+          </p>
         </div>
-        <div className="flex items-center gap-2 text-xs">
-          <span className="rounded bg-emerald-100 dark:bg-emerald-950 px-2 py-0.5 font-semibold text-emerald-700 dark:text-emerald-300">
-            {loggedCount} Logged
-          </span>
-          {missingCount > 0 && (
-            <span className="rounded bg-amber-100 dark:bg-amber-950 px-2 py-0.5 font-semibold text-amber-700 dark:text-amber-300">
-              {missingCount} Missing
-            </span>
-          )}
-        </div>
+        <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium tabular-nums">
+          {loggedCount}/{items.length}
+        </span>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+      <div className="mt-3 h-1.5 w-full rounded-full bg-secondary">
+        <div
+          className="h-full rounded-full bg-primary transition-all duration-500"
+          style={{ width: `${items.length ? (loggedCount / items.length) * 100 : 0}%` }}
+        />
+      </div>
+
+      <ul className="mt-4 grid grid-cols-1 gap-x-6 sm:grid-cols-2">
         {items.map(({ tag_name, isLogged }) => (
-          <div
-            key={tag_name}
-            className={`flex items-center justify-between rounded-lg border p-2.5 text-xs transition ${
-              isLogged
-                ? "border-emerald-200 bg-emerald-50/50 dark:border-emerald-900/40 dark:bg-emerald-950/20"
-                : "border-amber-200 bg-amber-50/50 dark:border-amber-900/40 dark:bg-amber-950/20"
-            }`}
-          >
-            <span className="font-medium truncate mr-1">{tag_name}</span>
+          <li key={tag_name} className="flex items-center justify-between border-b border-border/60 py-2.5 text-sm last:border-0 sm:[&:nth-last-child(2)]:border-0">
+            <span className={isLogged ? "" : "text-muted-foreground"}>{tag_name}</span>
             {isLogged ? (
-              <span className="flex shrink-0 items-center gap-1 font-semibold text-emerald-600 dark:text-emerald-400">
-                <CheckCircle2 className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Logged</span>
+              <span className="flex items-center gap-1 text-xs font-medium text-success">
+                <Check className="h-3.5 w-3.5" strokeWidth={2.5} /> Logged
               </span>
             ) : (
-              <span className="flex shrink-0 items-center gap-1 font-semibold text-amber-600 dark:text-amber-400">
-                <AlertTriangle className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Missing</span>
+              <span className="flex items-center gap-1 text-xs font-medium text-warning">
+                <CircleDashed className="h-3.5 w-3.5" /> Missing
               </span>
             )}
-          </div>
+          </li>
         ))}
-      </div>
-    </div>
+      </ul>
+    </section>
   );
 }

@@ -1,14 +1,3 @@
-"use client";
-
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
-} from "recharts";
 import { formatCurrency } from "@/lib/utils";
 
 interface TagSpend {
@@ -21,59 +10,32 @@ interface TagsBarChartProps {
 }
 
 export function TagsBarChart({ data }: TagsBarChartProps) {
-  if (!data || data.length === 0) {
-    return (
-      <div className="flex h-64 items-center justify-center rounded-xl border bg-card text-muted-foreground text-sm">
-        No tag data recorded for this month
-      </div>
-    );
-  }
-
-  // Top 8 tags sorted descending
   const topTags = [...data].sort((a, b) => b.value - a.value).slice(0, 8);
+  const max = topTags[0]?.value || 1;
 
   return (
-    <div className="rounded-xl border bg-card p-5 shadow-sm">
-      <h3 className="font-bold text-base text-foreground mb-1">
-        Top Expenses by Tag
-      </h3>
-      <p className="text-xs text-muted-foreground mb-4">
-        Highest spending areas for the month
-      </p>
+    <section className="card p-5 sm:p-6">
+      <h3 className="text-[15px] font-semibold">Top tags</h3>
+      <p className="mt-0.5 text-xs text-muted-foreground">Your 8 biggest spending areas</p>
 
-      <div className="h-64 w-full">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart
-            data={topTags}
-            layout="vertical"
-            margin={{ top: 5, right: 30, left: 40, bottom: 5 }}
-          >
-            <XAxis type="number" hide />
-            <YAxis
-              type="category"
-              dataKey="name"
-              axisLine={false}
-              tickLine={false}
-              tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-              width={80}
-            />
-            <Tooltip
-              formatter={(value: any) => [
-                formatCurrency(Number(value || 0)),
-                "Amount",
-              ]}
-            />
-            <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-              {topTags.map((_, index) => (
-                <Cell
-                  key={`tag-bar-${index}`}
-                  fill={index === 0 ? "#B6FF2E" : "#353945"}
-                />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
+      {topTags.length === 0 ? (
+        <p className="py-12 text-center text-sm text-muted-foreground">No expenses this month</p>
+      ) : (
+        <ol className="mt-5 space-y-2.5">
+          {topTags.map((tag, index) => (
+            <li key={tag.name} className="relative flex items-center gap-3 overflow-hidden rounded-lg px-3 py-2 text-sm">
+              <div
+                className={`absolute inset-y-0 left-0 rounded-lg ${index === 0 ? "bg-primary/20" : "bg-secondary"}`}
+                style={{ width: `${Math.max(4, (tag.value / max) * 100)}%` }}
+                aria-hidden
+              />
+              <span className="relative w-4 text-xs tabular-nums text-muted-foreground">{index + 1}</span>
+              <span className="relative flex-1 truncate font-medium">{tag.name}</span>
+              <span className="relative tabular-nums">{formatCurrency(tag.value)}</span>
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
   );
 }
