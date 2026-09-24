@@ -106,9 +106,9 @@ export function SalaryEngine({
           <div
             className={`h-full transition-all duration-500 rounded-full ${
               savingsRate >= 20
-                ? "bg-emerald-500"
+                ? "bg-primary"
                 : savingsRate > 0
-                ? "bg-blue-500"
+                ? "bg-primary/80"
                 : "bg-red-500"
             }`}
             style={{ width: `${Math.min(100, Math.max(0, savingsRate))}%` }}
