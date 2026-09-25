@@ -1,15 +1,32 @@
+"use client";
+
+import { useState } from "react";
 import { Check, CircleDashed } from "lucide-react";
+import { formatCurrency } from "@/lib/utils";
+
+const formatDay = (date: string) =>
+  new Date(date + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 
 interface RecurringItemStatus {
   tag_name: string;
   isLogged: boolean;
 }
 
-interface RecurringSentinelProps {
-  items: RecurringItemStatus[];
+interface LoggableBill {
+  tag_name: string;
+  amount: number;
+  date: string;
 }
 
-export function RecurringSentinel({ items }: RecurringSentinelProps) {
+interface RecurringSentinelProps {
+  items: RecurringItemStatus[];
+  loggableBills: LoggableBill[];
+  onLogMissing: () => void;
+}
+
+export function RecurringSentinel({ items, loggableBills, onLogMissing }: RecurringSentinelProps) {
+  const [isConfirming, setIsConfirming] = useState(false);
+  const loggableTotal = loggableBills.reduce((sum, b) => sum + b.amount, 0);
   const loggedCount = items.filter((i) => i.isLogged).length;
   const missingCount = items.length - loggedCount;
 
@@ -52,6 +69,50 @@ export function RecurringSentinel({ items }: RecurringSentinelProps) {
           </li>
         ))}
       </ul>
+
+      {loggableBills.length > 0 &&
+        (isConfirming ? (
+          <div className="mt-4 rounded-xl bg-secondary/60 p-4">
+            <div className="text-sm font-medium">Log with last month&apos;s amounts?</div>
+            <ul className="mt-2 space-y-1 text-sm">
+              {loggableBills.map((b) => (
+                <li key={b.tag_name} className="flex justify-between gap-3">
+                  <span className="text-muted-foreground">
+                    {b.tag_name} · {formatDay(b.date)}
+                  </span>
+                  <span className="tabular-nums">{formatCurrency(b.amount)}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-3 flex items-center justify-between border-t border-border/70 pt-3">
+              <span className="text-sm font-semibold tabular-nums">{formatCurrency(loggableTotal)}</span>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setIsConfirming(false)}
+                  className="rounded-full px-3.5 py-1.5 text-sm font-medium text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    setIsConfirming(false);
+                    onLogMissing();
+                  }}
+                  className="rounded-full bg-primary px-4 py-1.5 text-sm font-semibold text-primary-foreground transition hover:brightness-95"
+                >
+                  Log {loggableBills.length}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => setIsConfirming(true)}
+            className="mt-4 w-full rounded-full border py-2 text-sm font-medium transition hover:bg-secondary"
+          >
+            Log {loggableBills.length} missing bill{loggableBills.length === 1 ? "" : "s"}
+          </button>
+        ))}
     </section>
   );
 }

@@ -6,14 +6,22 @@ import { BudgetProvider, useBudget } from "@/lib/budget-context";
 import { Navbar } from "@/components/navbar";
 import { BottomNav } from "@/components/bottom-nav";
 import { QuickAddModal } from "@/components/quick-add-modal";
+import { ToastHost } from "@/components/toast";
 
 function ShellInner({ children }: { children: React.ReactNode }) {
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
-  const { categories, tags, addTransaction, isLoaded, loadError } = useBudget();
+  const { categories, tags, transactions, addTransaction, isLoaded, loadError, dismissToast } =
+    useBudget();
+
+  const openQuickAdd = () => {
+    // A leftover toast would sit on top of the sheet's numpad.
+    dismissToast();
+    setIsQuickAddOpen(true);
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground pb-28 md:pb-12 flex flex-col">
-      <Navbar onOpenQuickAdd={() => setIsQuickAddOpen(true)} />
+      <Navbar onOpenQuickAdd={openQuickAdd} />
 
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 sm:px-6 py-6 sm:py-8">
         {loadError && (
@@ -36,15 +44,18 @@ function ShellInner({ children }: { children: React.ReactNode }) {
         )}
       </main>
 
-      <BottomNav onOpenQuickAdd={() => setIsQuickAddOpen(true)} />
+      <BottomNav onOpenQuickAdd={openQuickAdd} />
 
       <QuickAddModal
         isOpen={isQuickAddOpen}
         onClose={() => setIsQuickAddOpen(false)}
         categories={categories}
         tags={tags}
+        transactions={transactions}
         onSave={addTransaction}
       />
+
+      <ToastHost />
     </div>
   );
 }

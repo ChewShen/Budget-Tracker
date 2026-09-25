@@ -1,15 +1,30 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { X, Delete } from "lucide-react";
 import { categoryIcon, categoryLabel } from "@/lib/categories";
-import { format } from "date-fns";
+import { format, subDays } from "date-fns";
+import { formatCurrency } from "@/lib/utils";
+import { Transaction } from "@/lib/types";
+
+// Food tag most likely for the current time of day (used as the default when the sheet opens).
+function mealForHour(hour: number): string {
+  if (hour >= 5 && hour < 11) return "Breakfast";
+  if (hour >= 11 && hour < 15) return "Lunch";
+  if (hour >= 15 && hour < 17) return "Snack";
+  if (hour >= 17 && hour < 22) return "Dinner";
+  return "Supper";
+}
+
+const RECENT_DAYS = 90;
+const RECENT_LIMIT = 6;
 
 interface QuickAddModalProps {
   isOpen: boolean;
   onClose: () => void;
   categories: { id: string; name: string }[];
   tags: { id: string; category_id: string; name: string }[];
+  transactions: Transaction[];
   onSave: (transaction: {
     amount: number;
     date: string;
@@ -20,11 +35,19 @@ interface QuickAddModalProps {
   }) => Promise<void>;
 }
 
+function appendDigit(current: string, digit: string): string {
+  if (digit === "." && current.includes(".")) return current;
+  if (current.includes(".") && current.split(".")[1].length >= 2) return current;
+  if (current.replace(".", "").length >= 7) return current;
+  return current + digit;
+}
+
 export function QuickAddModal({
   isOpen,
   onClose,
   categories,
   tags,
+  transactions,
   onSave,
 }: QuickAddModalProps) {
   const [amountStr, setAmountStr] = useState("");
@@ -35,32 +58,77 @@ export function QuickAddModal({
   const [isOneOff, setIsOneOff] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Initialize with Food as default category if available
+  // Most-used tags in the last 90 days, each with its most recent amount.
+  const recents = useMemo(() => {
+    const since = format(subDays(new Date(), RECENT_DAYS), "yyyy-MM-dd");
+    const byTag = new Map<string, { tx: Transaction; count: number }>();
+    [...transactions]
+      .filter((t) => t.date >= since)
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .forEach((t) => {
+        const entry = byTag.get(t.tag_id);
+        if (entry) entry.count += 1;
+        else byTag.set(t.tag_id, { tx: t, count: 1 });
+      });
+    return Array.from(byTag.values())
+      .sort((a, b) => b.count - a.count)
+      .slice(0, RECENT_LIMIT)
+      .map(({ tx }) => tx);
+  }, [transactions]);
+
+  // Fresh defaults every time the sheet opens: today's date, and the meal for the current time
+  // (falling back to the last-used tag, then the first category).
   useEffect(() => {
-    if (categories.length > 0 && !selectedCategoryId) {
-      const food = categories.find((c) => c.name.toLowerCase() === "food") || categories[0];
-      setSelectedCategoryId(food.id);
+    if (!isOpen || categories.length === 0) return;
+    setSelectedDate(format(new Date(), "yyyy-MM-dd"));
+
+    const food = categories.find((c) => c.name.toLowerCase() === "food");
+    const meal = food && tags.find((t) => t.category_id === food.id && t.name === mealForHour(new Date().getHours()));
+    const lastUsed = [...transactions].sort((a, b) => b.date.localeCompare(a.date))[0];
+
+    if (meal) {
+      setSelectedCategoryId(meal.category_id);
+      setSelectedTagId(meal.id);
+    } else if (lastUsed) {
+      setSelectedCategoryId(lastUsed.category_id);
+      setSelectedTagId(lastUsed.tag_id);
+    } else {
+      selectCategory((food || categories[0]).id);
     }
-  }, [categories, selectedCategoryId]);
+    // Only when the sheet opens; not when data changes while it is open.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+
+  const applyRecent = (tx: Transaction) => {
+    setSelectedCategoryId(tx.category_id);
+    setSelectedTagId(tx.tag_id);
+    setAmountStr(String(tx.amount));
+  };
 
   // Filter tags by selected category
   const availableTags = tags.filter((t) => t.category_id === selectedCategoryId);
 
-  // Default to first tag of category if tag not set or belongs to another category
-  useEffect(() => {
-    if (availableTags.length > 0) {
-      const currentTagValid = availableTags.some((t) => t.id === selectedTagId);
-      if (!currentTagValid) {
-        setSelectedTagId(availableTags[0].id);
-      }
-    } else {
-      setSelectedTagId("");
-    }
-  }, [selectedCategoryId, availableTags, selectedTagId]);
+  // Picking a category also picks its first tag (set together to avoid effects racing each other).
+  const selectCategory = (categoryId: string) => {
+    setSelectedCategoryId(categoryId);
+    setSelectedTagId(tags.find((t) => t.category_id === categoryId)?.id || "");
+  };
 
   useEffect(() => {
     if (!isOpen) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") return onClose();
+      // Type the amount on a physical keyboard, unless a text field has focus.
+      const target = e.target as HTMLElement;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") return;
+      if (/^[0-9.]$/.test(e.key)) {
+        e.preventDefault();
+        setAmountStr((prev) => appendDigit(prev, e.key));
+      } else if (e.key === "Backspace") {
+        e.preventDefault();
+        setAmountStr((prev) => prev.slice(0, -1));
+      }
+    };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [isOpen, onClose]);
@@ -68,9 +136,7 @@ export function QuickAddModal({
   if (!isOpen) return null;
 
   const handleNumpad = (digit: string) => {
-    if (digit === "." && amountStr.includes(".")) return;
-    if (amountStr.includes(".") && amountStr.split(".")[1].length >= 2) return;
-    setAmountStr((prev) => prev + digit);
+    setAmountStr((prev) => appendDigit(prev, digit));
   };
 
   const handleBackspace = () => {
@@ -83,26 +149,21 @@ export function QuickAddModal({
     if (!amount || isNaN(amount) || amount <= 0) return;
     if (!selectedCategoryId || !selectedTagId) return;
 
-    try {
-      setIsSubmitting(true);
-      await onSave({
-        amount,
-        date: selectedDate,
-        category_id: selectedCategoryId,
-        tag_id: selectedTagId,
-        description: description.trim() || undefined,
-        is_one_off: isOneOff,
-      });
-      // Reset & close
-      setAmountStr("");
-      setDescription("");
-      setIsOneOff(false);
-      onClose();
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsSubmitting(false);
-    }
+    // The row appears instantly; a failed save shows a Retry toast, so there's no need to wait here.
+    setIsSubmitting(true);
+    onSave({
+      amount,
+      date: selectedDate,
+      category_id: selectedCategoryId,
+      tag_id: selectedTagId,
+      description: description.trim() || undefined,
+      is_one_off: isOneOff,
+    }).catch((err) => console.error(err));
+    setAmountStr("");
+    setDescription("");
+    setIsOneOff(false);
+    setIsSubmitting(false);
+    onClose();
   };
 
   const amountDisplay = amountStr || "0";
@@ -149,6 +210,26 @@ export function QuickAddModal({
             </div>
           </div>
 
+          {/* Recent shortcuts: fill tag + amount in one tap */}
+          {recents.length > 0 && (
+            <div>
+              <div className="mb-1.5 text-xs font-medium text-muted-foreground">Recent</div>
+              <div className="-mx-5 flex gap-1.5 overflow-x-auto px-5 scrollbar-none">
+                {recents.map((tx) => (
+                  <button
+                    key={tx.tag_id}
+                    type="button"
+                    onClick={() => applyRecent(tx)}
+                    className="flex shrink-0 items-baseline gap-1.5 rounded-xl border bg-background px-3 py-2 text-xs transition hover:border-foreground/40 active:scale-95"
+                  >
+                    <span className="font-medium">{tx.tag_name}</span>
+                    <span className="tabular-nums text-muted-foreground">{formatCurrency(tx.amount)}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Category */}
           <div className="-mx-5 flex gap-1.5 overflow-x-auto px-5 scrollbar-none">
             {categories.map((cat) => {
@@ -158,7 +239,7 @@ export function QuickAddModal({
                 <button
                   key={cat.id}
                   type="button"
-                  onClick={() => setSelectedCategoryId(cat.id)}
+                  onClick={() => selectCategory(cat.id)}
                   className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition ${
                     isActive
                       ? "bg-primary text-primary-foreground"
@@ -173,7 +254,7 @@ export function QuickAddModal({
           </div>
 
           {/* Tags */}
-          <div className="flex max-h-[4.75rem] flex-wrap gap-1.5 overflow-y-auto">
+          <div className="flex max-h-[5.75rem] flex-wrap gap-1.5 overflow-y-auto">
             {availableTags.map((tag) => (
               <button
                 key={tag.id}
