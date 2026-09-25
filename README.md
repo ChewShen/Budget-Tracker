@@ -27,15 +27,15 @@ Hosted $100\%$ free on **Vercel** and **Supabase (PostgreSQL)** with no expiring
 - **🔄 Two-Way Data Portability & Sync**:
   - Auto-syncs between client local storage and Supabase cloud PostgreSQL.
   - Ingests all historical transactions and savings from `Monthly Budget.xlsm`.
-  - 1-click export to CSV / Excel at any time.
+  - 1-click export to CSV at any time.
 
 ---
 
 ## 🛠️ Tech Stack
 
 - **Frontend & App Framework**: [Next.js 15 (App Router)](https://nextjs.org/) + [React 19](https://react.dev/)
-- **Styling & UI**: [Tailwind CSS](https://tailwindcss.com/) + [shadcn/ui](https://ui.shadcn.com/) + [Lucide Icons](https://lucide.dev/)
-- **Charts & Visualizations**: [Recharts](https://recharts.org/) (Category Donut & Tag Bar Charts)
+- **Styling & UI**: [Tailwind CSS](https://tailwindcss.com/) + [Lucide Icons](https://lucide.dev/) + Inter font
+- **Charts & Visualizations**: [Recharts](https://recharts.org/) (daily spend chart) + ranked category and tag bar lists
 - **Database & Authentication**: [Supabase (PostgreSQL 16)](https://supabase.com/) with Row-Level Security (RLS)
 - **PWA Integration**: Mobile Web App Manifest (`public/manifest.json`)
 - **Hosting**: [Vercel](https://vercel.com/) (Serverless Edge, 100% Free Hobby Tier)

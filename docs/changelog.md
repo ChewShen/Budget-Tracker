@@ -10,8 +10,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned
-- [ ] Push Git commit to GitHub and trigger Vercel deployment.
+- [ ] Trigger Vercel deployment of v0.4.0.
+- [ ] Add PWA icons (`public/icon-192.png`, `public/icon-512.png`) referenced by the manifest.
 - [ ] Configure custom domain (optional) and install PWA on mobile device.
+
+---
+
+## [0.4.0] - 2026-09-26
+
+### Added
+- **Authentication**: Email + password sign-in at `/login` (no public sign-up), middleware redirect for signed-out visitors, and a sign-out button.
+- **Owner-only database access**: `scripts/secure_rls.sql` assigns existing rows to the owner, defaults `user_id` to `auth.uid()`, and replaces every policy with owner-only RLS (including `recurring_sentinel`).
+- **Editable salary**: Gross salary, EPF %, SOCSO and EIS can be edited from the Cash flow card and are stored in `user_profiles`.
+- **Undo delete**: Deleting a transaction shows an Undo toast for 5 seconds before it reaches the database.
+- **Faster entry**: Time-of-day meal tag default, Recent shortcuts (tag + last amount), keyboard amount entry on desktop, and one-tap logging of missing monthly bills with last month's amounts.
+- **Light/dark theme toggle**, with dark as the default.
+
+### Changed
+- **Refined dark redesign**: Neutral near-black surfaces with lime as an accent fill only, Inter font, spend hero with daily bar chart and month-over-month change, ranked category and tag lists (replacing the donut chart), transactions grouped by day, net worth hero on Savings, floating mobile nav and bottom-sheet quick add.
+- The app opens on the current month instead of a fixed month.
+- Data loads only after sign-in; the localStorage cache is used only in local-only mode (no Supabase configured).
+
+### Fixed
+- Failed saves no longer fail silently: the optimistic row is rolled back and a Retry toast is shown.
+- Saving account balances no longer creates duplicate `monthly_savings` rows.
+- Lime text was unreadable on light backgrounds, and `dark:` styles never applied, mixing light and dark colours.
+
+### Security
+- Previously all transactions and savings were readable and writable by anyone holding the public anon key. After running `secure_rls.sql`, anonymous requests return no rows and writes are rejected.
 
 ---
 
