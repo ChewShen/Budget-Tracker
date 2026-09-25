@@ -37,6 +37,11 @@ export default function DashboardPage() {
     setSelectedMonth,
     deleteTransaction,
     isSyncedWithSupabase,
+    profile,
+    updateProfile,
+    tags,
+    addTransaction,
+    showToast,
   } = useBudget();
 
   // Filter transactions for currently selected month (YYYY-MM)
@@ -84,8 +89,8 @@ export default function DashboardPage() {
     };
   }
 
-  // 4. Salary Engine (Gross RM 3,500 default)
-  const salaryMetrics = calculateSalaryMetrics(3500, totalSpend);
+  // 4. Salary Engine (gross salary and SOCSO/EIS from the user's profile)
+  const salaryMetrics = calculateSalaryMetrics(profile.default_gross_salary, totalSpend, profile);
 
   // 5. Category Breakdown for Donut Chart
   const catMap: Record<string, number> = {};
@@ -119,6 +124,49 @@ export default function DashboardPage() {
     tag_name: tag,
     isLogged: loggedTagsInMonth.has(tag),
   }));
+
+  // Missing bills that can be logged in one tap: reuse the amount and day of the last payment.
+  const daysInSelectedMonth = getDaysInMonth(monthDate);
+  const todayStr = format(new Date(), "yyyy-MM-dd");
+  const missingBills = recurringStatus
+    .filter((r) => !r.isLogged)
+    .flatMap((r) => {
+      const tag = tags.find((t) => t.name === r.tag_name);
+      if (!tag) return [];
+      const last = transactions
+        .filter((t) => t.tag_id === tag.id && t.date < `${selectedMonth}-01`)
+        .sort((a, b) => b.date.localeCompare(a.date))[0];
+      if (!last) return [];
+      const day = Math.min(Number(last.date.slice(8, 10)), daysInSelectedMonth);
+      const date = `${selectedMonth}-${String(day).padStart(2, "0")}`;
+      return [
+        {
+          tag_name: tag.name,
+          amount: last.amount,
+          date: date > todayStr ? todayStr : date,
+          category_id: tag.category_id,
+          tag_id: tag.id,
+        },
+      ];
+    });
+  // Don't offer to log bills into a future month.
+  const loggableBills = selectedMonth > todayStr.slice(0, 7) ? [] : missingBills;
+
+  const handleLogMissingBills = () => {
+    loggableBills.forEach((b) =>
+      addTransaction({
+        amount: b.amount,
+        date: b.date,
+        category_id: b.category_id,
+        tag_id: b.tag_id,
+        is_one_off: false,
+      })
+    );
+    showToast({
+      tone: "default",
+      message: `Logged ${loggableBills.length} bill${loggableBills.length === 1 ? "" : "s"}`,
+    });
+  };
 
   const handleExportCsv = () => {
     const headers = ["Date", "Category", "Tag", "Description", "Amount", "One-off"];
@@ -201,8 +249,14 @@ export default function DashboardPage() {
           netSalary={salaryMetrics.netSalary}
           netCashSaved={salaryMetrics.netCashSaved}
           savingsRate={salaryMetrics.savingsRate}
+          profile={profile}
+          onSaveProfile={updateProfile}
         />
-        <RecurringSentinel items={recurringStatus} />
+        <RecurringSentinel
+          items={recurringStatus}
+          loggableBills={loggableBills}
+          onLogMissing={handleLogMissingBills}
+        />
       </div>
 
       {/* Recent transactions */}

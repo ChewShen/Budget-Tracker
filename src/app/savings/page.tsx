@@ -14,7 +14,7 @@ import {
 import { MonthlySavings } from "@/lib/types";
 
 export default function SavingsPage() {
-  const { savings, transactions, selectedMonth, setSelectedMonth, updateSavings } =
+  const { savings, transactions, selectedMonth, setSelectedMonth, updateSavings, profile } =
     useBudget();
 
   // Find savings entry for active month or fallback
@@ -68,7 +68,7 @@ export default function SavingsPage() {
     t.date.startsWith(selectedMonth)
   );
   const totalSpend = monthTransactions.reduce((sum, t) => sum + t.amount, 0);
-  const { netCashSaved } = calculateSalaryMetrics(3500, totalSpend);
+  const { netCashSaved } = calculateSalaryMetrics(profile.default_gross_salary, totalSpend, profile);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
