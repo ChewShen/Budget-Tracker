@@ -27,15 +27,15 @@ Hosted $100\%$ free on **Vercel** and **Supabase (PostgreSQL)** with no expiring
 - **🔄 Two-Way Data Portability & Sync**:
   - Auto-syncs between client local storage and Supabase cloud PostgreSQL.
   - Ingests all historical transactions and savings from `Monthly Budget.xlsm`.
-  - 1-click export to CSV / Excel at any time.
+  - 1-click export to CSV at any time.
 
 ---
 
 ## 🛠️ Tech Stack
 
 - **Frontend & App Framework**: [Next.js 15 (App Router)](https://nextjs.org/) + [React 19](https://react.dev/)
-- **Styling & UI**: [Tailwind CSS](https://tailwindcss.com/) + [shadcn/ui](https://ui.shadcn.com/) + [Lucide Icons](https://lucide.dev/)
-- **Charts & Visualizations**: [Recharts](https://recharts.org/) (Category Donut & Tag Bar Charts)
+- **Styling & UI**: [Tailwind CSS](https://tailwindcss.com/) + [Lucide Icons](https://lucide.dev/) + Inter font
+- **Charts & Visualizations**: [Recharts](https://recharts.org/) (daily spend chart) + ranked category and tag bar lists
 - **Database & Authentication**: [Supabase (PostgreSQL 16)](https://supabase.com/) with Row-Level Security (RLS)
 - **PWA Integration**: Mobile Web App Manifest (`public/manifest.json`)
 - **Hosting**: [Vercel](https://vercel.com/) (Serverless Edge, 100% Free Hobby Tier)
@@ -161,6 +161,14 @@ To populate your cloud database with all historical transactions and categories:
    - **31 Tags**
    - **172 Historical Transactions**
    - **5 Monthly Savings Snapshots**
+
+### 3. Lock the Database to Your Account
+The seed script opens the tables so data can be loaded. Close them afterwards:
+1. Supabase Dashboard → **Authentication → Users → Add user → Create new user** with your email and a strong password (tick **Auto Confirm User**).
+2. **Authentication → Sign In / Providers → Email** → turn off **Allow new users to sign up**.
+3. Set your email in [`scripts/secure_rls.sql`](scripts/secure_rls.sql) and run it in the SQL Editor.
+
+This assigns all data to your user and replaces every policy with owner-only RLS. The app then requires sign-in (`/login`). **Do not re-run `seed_data.sql` afterwards**; it re-opens the tables.
 
 ---
 

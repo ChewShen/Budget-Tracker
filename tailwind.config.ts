@@ -9,22 +9,10 @@ export default {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ["var(--font-sans)", "system-ui", "-apple-system", "Segoe UI", "sans-serif"],
+      },
       colors: {
-        // Custom Brand Tokens
-        lime: {
-          DEFAULT: "#B6FF2E",
-          spark: "#B6FF2E",
-          hover: "#A3ED1C",
-          dark: "#84C80A",
-        },
-        graphite: {
-          DEFAULT: "#23262F",
-          darker: "#181A20",
-          card: "#23262F",
-          border: "#353945",
-          muted: "#777E90",
-          light: "#E6E8EC",
-        },
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
         card: {
@@ -55,14 +43,33 @@ export default {
           DEFAULT: "hsl(var(--destructive))",
           foreground: "hsl(var(--destructive-foreground))",
         },
+        highlight: "hsl(var(--highlight))",
+        success: "hsl(var(--success))",
+        warning: "hsl(var(--warning))",
+        danger: "hsl(var(--danger))",
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
       },
       borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
+        "2xl": "var(--radius)",
+        xl: "calc(var(--radius) - 4px)",
+        lg: "calc(var(--radius) - 6px)",
+        md: "calc(var(--radius) - 8px)",
+      },
+      keyframes: {
+        "fade-in": {
+          from: { opacity: "0" },
+          to: { opacity: "1" },
+        },
+        "sheet-up": {
+          from: { opacity: "0", transform: "translateY(24px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
+      },
+      animation: {
+        "fade-in": "fade-in 150ms ease-out",
+        "sheet-up": "sheet-up 220ms cubic-bezier(0.22, 1, 0.36, 1)",
       },
     },
   },

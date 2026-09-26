@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, Calendar } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { format, addMonths, subMonths, parse } from "date-fns";
 
 interface MonthSelectorProps {
@@ -10,55 +10,42 @@ interface MonthSelectorProps {
 
 export function MonthSelector({ currentMonth, onChangeMonth }: MonthSelectorProps) {
   const date = parse(`${currentMonth}-01`, "yyyy-MM-dd", new Date());
+  const isCurrentMonth = format(new Date(), "yyyy-MM") === currentMonth;
 
-  const handlePrev = () => {
-    const prev = subMonths(date, 1);
-    onChangeMonth(format(prev, "yyyy-MM"));
-  };
-
-  const handleNext = () => {
-    const next = addMonths(date, 1);
+  const shift = (delta: number) => {
+    const next = delta > 0 ? addMonths(date, 1) : subMonths(date, 1);
     onChangeMonth(format(next, "yyyy-MM"));
   };
 
-  const handleToday = () => {
-    onChangeMonth(format(new Date(), "yyyy-MM"));
-  };
-
-  const isCurrentMonth = format(new Date(), "yyyy-MM") === currentMonth;
-
   return (
-    <div className="flex items-center justify-between gap-2 rounded-xl border bg-card p-2 shadow-sm">
-      <button
-        onClick={handlePrev}
-        className="flex h-9 w-9 items-center justify-center rounded-lg border bg-background text-muted-foreground transition hover:bg-muted hover:text-foreground active:scale-95"
-        title="Previous Month"
-      >
-        <ChevronLeft className="h-5 w-5" />
-      </button>
-
-      <div className="flex items-center gap-2 px-2">
-        <Calendar className="h-4 w-4 text-primary" />
-        <span className="font-bold text-base sm:text-lg">
+    <div className="flex items-center gap-2">
+      <div className="flex items-center rounded-full border bg-card p-1">
+        <button
+          onClick={() => shift(-1)}
+          className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+          aria-label="Previous month"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        <span className="min-w-[8.5rem] text-center text-sm font-semibold tabular-nums">
           {format(date, "MMMM yyyy")}
         </span>
-        {!isCurrentMonth && (
-          <button
-            onClick={handleToday}
-            className="rounded bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary hover:bg-primary/20"
-          >
-            Today
-          </button>
-        )}
+        <button
+          onClick={() => shift(1)}
+          className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+          aria-label="Next month"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
       </div>
-
-      <button
-        onClick={handleNext}
-        className="flex h-9 w-9 items-center justify-center rounded-lg border bg-background text-muted-foreground transition hover:bg-muted hover:text-foreground active:scale-95"
-        title="Next Month"
-      >
-        <ChevronRight className="h-5 w-5" />
-      </button>
+      {!isCurrentMonth && (
+        <button
+          onClick={() => onChangeMonth(format(new Date(), "yyyy-MM"))}
+          className="rounded-full px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+        >
+          Today
+        </button>
+      )}
     </div>
   );
 }
