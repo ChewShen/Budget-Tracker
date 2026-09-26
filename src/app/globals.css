@@ -2,74 +2,133 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Design tokens (HSL triplets so Tailwind can apply alpha, e.g. bg-primary/10).
+ * Dark is the default theme; light is opt-in via <html data-theme="light">.
+ * Lime is a fill colour only. Use `text-highlight` for lime-ish text/icons so
+ * it stays legible on both themes.
+ */
 :root {
-  /* Light Mode with Graphite typography and Lime Spark accents */
-  --background: 220 20% 97%;
-  --foreground: 225 15% 16%; /* Graphite #23262F */
+  color-scheme: dark;
 
-  --card: 0 0% 100%;
-  --card-foreground: 225 15% 16%;
+  --background: 228 14% 5%; /* #0B0C0F */
+  --foreground: 220 14% 96%; /* #F3F4F6 */
 
-  --popover: 0 0% 100%;
-  --popover-foreground: 225 15% 16%;
+  --card: 225 12% 9%; /* #14161B */
+  --card-foreground: 220 14% 96%;
 
-  --primary: 81 100% 48%; /* Lime Spark */
-  --primary-foreground: 225 15% 14%; /* Deep Graphite for high-contrast text on Lime */
+  --popover: 225 12% 11%;
+  --popover-foreground: 220 14% 96%;
 
-  --secondary: 220 14% 92%;
-  --secondary-foreground: 225 15% 16%;
+  --primary: 81 100% 59%; /* Lime #B6FF2E */
+  --primary-foreground: 228 14% 7%;
 
-  --muted: 220 14% 92%;
-  --muted-foreground: 225 10% 45%;
+  --secondary: 224 12% 14%; /* #1F2228 */
+  --secondary-foreground: 220 14% 96%;
 
-  --accent: 81 100% 92%;
-  --accent-foreground: 225 15% 16%;
+  --muted: 224 12% 14%;
+  --muted-foreground: 222 7% 58%; /* #8B909C */
 
-  --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 210 40% 98%;
+  --accent: 224 12% 16%;
+  --accent-foreground: 220 14% 96%;
 
-  --border: 220 13% 88%;
-  --input: 220 13% 88%;
-  --ring: 81 100% 48%;
+  --highlight: 81 100% 59%;
+  --success: 81 100% 59%;
+  --warning: 40 95% 57%; /* #F8B330 */
+  --danger: 0 80% 68%; /* #F07171 */
+  --destructive: 0 80% 68%;
+  --destructive-foreground: 0 0% 100%;
 
-  --radius: 0.75rem;
+  --border: 224 12% 16%; /* #23262D */
+  --input: 224 12% 18%;
+  --ring: 81 100% 59%;
+
+  --chart-bar: 224 10% 24%;
+
+  --radius: 1rem;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    /* Sleek Dark Mode: Graphite #23262F cards + Lime Spark #B6FF2E electric accents */
-    --background: 225 14% 10%; /* #14171A */
-    --foreground: 210 20% 98%;
+:root[data-theme="light"] {
+  color-scheme: light;
 
-    --card: 225 15% 16%; /* Pure Graphite #23262F */
-    --card-foreground: 210 20% 98%;
+  --background: 220 20% 97%; /* #F6F7F9 */
+  --foreground: 228 14% 8%;
 
-    --popover: 225 15% 16%; /* Graphite #23262F */
-    --popover-foreground: 210 20% 98%;
+  --card: 0 0% 100%;
+  --card-foreground: 228 14% 8%;
 
-    --primary: 81 100% 59%; /* Lime Spark #B6FF2E */
-    --primary-foreground: 225 15% 12%; /* Deep Graphite text on Lime */
+  --popover: 0 0% 100%;
+  --popover-foreground: 228 14% 8%;
 
-    --secondary: 225 13% 24%; /* #353945 */
-    --secondary-foreground: 210 20% 98%;
+  --primary: 81 100% 59%;
+  --primary-foreground: 228 14% 7%;
 
-    --muted: 225 13% 22%;
-    --muted-foreground: 225 10% 65%;
+  --secondary: 220 16% 94%;
+  --secondary-foreground: 228 14% 8%;
 
-    --accent: 225 13% 24%;
-    --accent-foreground: 210 20% 98%;
+  --muted: 220 16% 94%;
+  --muted-foreground: 222 8% 42%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+  --accent: 220 16% 92%;
+  --accent-foreground: 228 14% 8%;
 
-    --border: 225 13% 24%; /* #353945 */
-    --input: 225 13% 24%;
-    --ring: 81 100% 59%; /* Lime Spark #B6FF2E */
+  --highlight: 86 80% 28%; /* deep lime, readable on white */
+  --success: 86 80% 28%;
+  --warning: 32 90% 36%;
+  --danger: 0 62% 50%;
+  --destructive: 0 62% 50%;
+  --destructive-foreground: 0 0% 100%;
+
+  --border: 220 14% 90%;
+  --input: 220 14% 86%;
+  --ring: 86 80% 38%;
+
+  --chart-bar: 220 12% 84%;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "cv11", "ss01";
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type="number"] {
+    -moz-appearance: textfield;
   }
 }
 
-body {
-  background-color: hsl(var(--background));
-  color: hsl(var(--foreground));
-  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+@layer components {
+  .card {
+    @apply rounded-2xl border bg-card text-card-foreground;
+  }
+
+  .eyebrow {
+    @apply text-[13px] font-medium text-muted-foreground;
+  }
+
+  .field {
+    @apply w-full rounded-xl border border-input bg-background px-3.5 py-2.5 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-ring/60 focus:ring-2 focus:ring-ring/20;
+  }
+}
+
+@layer utilities {
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
 }

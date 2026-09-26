@@ -5,6 +5,7 @@ import { useBudget } from "@/lib/budget-context";
 import { LedgerTable } from "@/components/ledger-table";
 import { MonthSelector } from "@/components/month-selector";
 import { formatCurrency } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
 export default function TransactionsPage() {
   const {
@@ -25,31 +26,38 @@ export default function TransactionsPage() {
   );
 
   return (
-    <div className="space-y-6">
-      {/* Top Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-black text-foreground">
-            Transaction Ledger
-          </h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {displayedTransactions.length} entries recorded • Total:{" "}
-            <span className="font-bold text-foreground">
+          <h1 className="text-2xl font-semibold tracking-tight">Transactions</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {displayedTransactions.length} entries ·{" "}
+            <span className="font-medium text-foreground tabular-nums">
               {formatCurrency(totalAmount)}
             </span>
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground cursor-pointer">
-            <input
-              type="checkbox"
-              checked={filterByMonth}
-              onChange={(e) => setFilterByMonth(e.target.checked)}
-              className="rounded text-primary"
-            />
-            <span>Filter by active month</span>
-          </label>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex rounded-full border bg-card p-1 text-xs font-medium">
+            {[
+              { value: true, label: "Month" },
+              { value: false, label: "All time" },
+            ].map((opt) => (
+              <button
+                key={opt.label}
+                onClick={() => setFilterByMonth(opt.value)}
+                className={cn(
+                  "rounded-full px-3.5 py-1.5 transition",
+                  filterByMonth === opt.value
+                    ? "bg-secondary text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
 
           {filterByMonth && (
             <MonthSelector
@@ -60,7 +68,6 @@ export default function TransactionsPage() {
         </div>
       </div>
 
-      {/* Ledger Data Table */}
       <LedgerTable
         transactions={displayedTransactions}
         onDeleteTransaction={deleteTransaction}
