@@ -2,65 +2,71 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Receipt, PiggyBank, Plus } from "lucide-react";
+import { LogOut, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { useBudget } from "@/lib/budget-context";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 interface NavbarProps {
   onOpenQuickAdd: () => void;
 }
 
+const LINKS = [
+  { href: "/", label: "Overview" },
+  { href: "/transactions", label: "Transactions" },
+  { href: "/savings", label: "Savings" },
+];
+
 export function Navbar({ onOpenQuickAdd }: NavbarProps) {
   const pathname = usePathname();
-
-  const links = [
-    { href: "/", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/transactions", label: "Ledger", icon: Receipt },
-    { href: "/savings", label: "Savings & Interest", icon: PiggyBank },
-  ];
+  const { signOut } = useBudget();
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
-        {/* Brand */}
-        <div className="flex items-center gap-6">
-          <Link href="/" className="flex items-center gap-2 font-bold text-lg text-primary">
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground font-black text-xl shadow-sm">
-              RM
-            </span>
-            <span className="hidden sm:inline-block font-semibold text-foreground">
-              Budget Tracker
-            </span>
-          </Link>
+    <header className="sticky top-0 z-40 w-full border-b border-border/60 bg-background/80 backdrop-blur-xl">
+      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
+        <Link href="/" className="flex items-center gap-2.5">
+          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-[11px] font-bold tracking-tight text-primary-foreground">
+            RM
+          </span>
+          <span className="text-[15px] font-semibold tracking-tight">Budget</span>
+        </Link>
 
-          {/* Desktop Nav Links */}
-          <nav className="hidden md:flex items-center gap-1 text-sm font-medium">
-            {links.map(({ href, label, icon: Icon }) => (
-              <Link
-                key={href}
-                href={href}
-                className={cn(
-                  "flex items-center gap-2 rounded-md px-3 py-2 transition-colors hover:text-foreground",
-                  pathname === href
-                    ? "bg-secondary text-foreground font-semibold"
-                    : "text-muted-foreground"
-                )}
-              >
-                <Icon className="h-4 w-4" />
-                {label}
-              </Link>
-            ))}
-          </nav>
-        </div>
+        <nav className="hidden md:flex items-center gap-1 rounded-full border bg-card p-1 text-sm">
+          {LINKS.map(({ href, label }) => (
+            <Link
+              key={href}
+              href={href}
+              className={cn(
+                "rounded-full px-4 py-1.5 font-medium transition-colors",
+                pathname === href
+                  ? "bg-secondary text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {label}
+            </Link>
+          ))}
+        </nav>
 
-        {/* Quick Add CTA Button */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1.5">
+          <ThemeToggle />
+          {isSupabaseConfigured && (
+            <button
+              onClick={signOut}
+              className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+              aria-label="Sign out"
+              title="Sign out"
+            >
+              <LogOut className="h-[18px] w-[18px]" />
+            </button>
+          )}
           <button
             onClick={onOpenQuickAdd}
-            className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm transition hover:bg-primary/90 active:scale-95"
+            className="hidden md:flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:brightness-95 active:scale-[0.97]"
           >
-            <Plus className="h-4 w-4 stroke-[2.5]" />
-            <span className="hidden sm:inline">Add Expense</span>
-            <span className="sm:hidden">Add</span>
+            <Plus className="h-4 w-4" strokeWidth={2.5} />
+            Add expense
           </button>
         </div>
       </div>
