@@ -210,3 +210,32 @@ export function spendSplit(monthTxs: Transaction[], billTagIds: Set<string>): Sp
   const everyday = monthTxs.filter((t) => !billTagIds.has(t.tag_id) && !t.is_one_off);
   return { everyday: sumAmounts(everyday), bills: sumAmounts(bills), oneOff: sumAmounts(oneOff) };
 }
+
+export interface YearToDate {
+  year: number;
+  months: string[]; // months with data, oldest first
+  spent: number;
+  saved: number; // take-home minus spending, summed over those months
+  savingsRate: number; // saved / total take-home, %
+  averageMonthly: number;
+}
+
+// Months of `throughMonth`'s year, up to and including it, that have any expenses.
+// Months without data are left out rather than counted as a full month of saving.
+export function yearToDate(txs: Transaction[], throughMonth: string, takeHome: number): YearToDate {
+  const year = Number(throughMonth.slice(0, 4));
+  const months = Array.from(new Set(txs.map((t) => t.date.slice(0, 7))))
+    .filter((m) => m.startsWith(`${year}-`) && m <= throughMonth)
+    .sort();
+  const spent = sumAmounts(txs.filter((t) => months.includes(t.date.slice(0, 7))));
+  const income = takeHome * months.length;
+  const saved = round2(income - spent);
+  return {
+    year,
+    months,
+    spent,
+    saved,
+    savingsRate: income > 0 ? round2((saved / income) * 100) : 0,
+    averageMonthly: months.length ? round2(spent / months.length) : 0,
+  };
+}

@@ -10,7 +10,16 @@ import { SpendHero } from "@/components/spend-hero";
 import { SalaryEngine } from "@/components/salary-engine";
 import { RecurringSentinel, type BillStatus } from "@/components/recurring-sentinel";
 import { canAutoLog } from "@/lib/bills";
-import { baseline, monthForecast, monthInsights, monthProgress, monthlyTotals, spendSplit } from "@/lib/analytics";
+import {
+  baseline,
+  monthForecast,
+  monthInsights,
+  monthProgress,
+  monthlyTotals,
+  spendSplit,
+  yearToDate,
+} from "@/lib/analytics";
+import { YearToDateCard } from "@/components/year-to-date";
 import { SpendSplitCard } from "@/components/spend-split";
 import { SpendingCalendar } from "@/components/spending-calendar";
 import { InsightsCard } from "@/components/insights-card";
@@ -328,7 +337,10 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-1 gap-4 sm:gap-5 lg:grid-cols-2">
         <SpendingCalendar month={selectedMonth} today={todayStr} days={dailySeries} />
-        <SpendSplitCard split={spendSplit(monthTransactions, billTagIds)} />
+        <div className="space-y-4 sm:space-y-5">
+          <SpendSplitCard split={spendSplit(monthTransactions, billTagIds)} />
+          <YearToDateCard ytd={yearToDate(transactions, selectedMonth, salaryMetrics.netSalary)} />
+        </div>
       </div>
 
       {/* Recent transactions */}
