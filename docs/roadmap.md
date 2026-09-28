@@ -34,5 +34,7 @@ When one is picked up, move it to `docs/changelog.md` under the version that shi
 
 ## Data housekeeping
 
+- **Repo privacy (important)**: The GitHub repo is public and still contains real financial data: `Monthly Budget.xlsm`, `scripts/seed_data.sql`, and the old `src/lib/mock-data.ts` in git history (it was replaced with generated demo data in v0.12.0, which removed it from the live site). Options: make the repo private (GitHub → Settings → Danger Zone; simplest, covers history), or remove the files and rewrite history with a force push (copies may already exist in forks/caches). `scripts/generate_mock_data.py` would regenerate the real-data version of `mock-data.ts`, so don't run it.
+
 - Check August 2026 balances from the Excel import (Main checking RM 0, EPF RM 10 look wrong).
 - Optionally delete the all-zero savings rows the import created for Sep–Dec 2026 (the app already treats them as "not recorded").
