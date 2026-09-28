@@ -1,11 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Repeat, Trash2 } from "lucide-react";
+import { format } from "date-fns";
 import { useBudget } from "@/lib/budget-context";
 import { categoryLabel } from "@/lib/categories";
 import { formatCurrency } from "@/lib/utils";
 import { RecurringBill } from "@/lib/types";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { dueDateIn } from "@/lib/bills";
 
 const DAYS = Array.from({ length: 31 }, (_, i) => i + 1);
 const ordinal = (n: number) => {
@@ -25,10 +28,21 @@ function BillForm({
   bill?: RecurringBill; // editing when set, adding otherwise
   onDone: () => void;
 }) {
-  const { tags, categories, bills, addBill, updateBill, removeBill } = useBudget();
+  const { tags, categories, bills, transactions, addBill, updateBill, removeBill } = useBudget();
   const [tagId, setTagId] = useState(bill?.tag_id ?? "");
   const [amount, setAmount] = useState(bill?.expected_amount ? String(bill.expected_amount) : "");
   const [dueDay, setDueDay] = useState(bill?.due_day ? String(bill.due_day) : "");
+  const [autoLog, setAutoLog] = useState(Boolean(bill?.auto_log));
+  const canAuto = toAmount(amount) !== null && Boolean(dueDay);
+
+  // Turning auto-add on after this month's due day: say when this month's expense will appear.
+  const thisMonth = format(new Date(), "yyyy-MM");
+  const pastDueUnpaid =
+    autoLog &&
+    canAuto &&
+    tagId &&
+    dueDateIn(thisMonth, Number(dueDay)) <= format(new Date(), "yyyy-MM-dd") &&
+    !transactions.some((t) => t.tag_id === tagId && t.date.startsWith(thisMonth));
   const [isBusy, setIsBusy] = useState(false);
 
   const available = tags.filter((t) => t.id === bill?.tag_id || !bills.some((b) => b.tag_id === t.id));
@@ -37,7 +51,11 @@ function BillForm({
     e.preventDefault();
     if (!tagId) return;
     setIsBusy(true);
-    const changes = { expected_amount: toAmount(amount), due_day: dueDay ? Number(dueDay) : null };
+    const changes = {
+      expected_amount: toAmount(amount),
+      due_day: dueDay ? Number(dueDay) : null,
+      auto_log: autoLog && canAuto,
+    };
     const ok = bill ? await updateBill(bill.id, changes) : await addBill(tagId, changes);
     setIsBusy(false);
     if (ok) onDone();
@@ -91,6 +109,36 @@ function BillForm({
           </select>
         </label>
       </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={autoLog && canAuto}
+        disabled={!canAuto}
+        onClick={() => setAutoLog((v) => !v)}
+        className="flex w-full items-center justify-between gap-3 rounded-xl border px-3.5 py-3 text-left transition disabled:opacity-50"
+      >
+        <span>
+          <span className="block text-sm font-medium">Add automatically</span>
+          <span className="block text-xs text-muted-foreground">
+            {canAuto
+              ? "Adds the expected amount on the due day each month, unless it's already logged."
+              : "Set an expected amount and a due day to turn this on."}
+          </span>
+        </span>
+        <span className={`relative h-5 w-9 shrink-0 rounded-full transition ${autoLog && canAuto ? "bg-primary" : "bg-secondary"}`}>
+          <span
+            className={`absolute top-0.5 h-4 w-4 rounded-full bg-background shadow transition-all ${
+              autoLog && canAuto ? "left-[18px]" : "left-0.5"
+            }`}
+          />
+        </span>
+      </button>
+      {pastDueUnpaid && (
+        <p className="text-xs text-muted-foreground">
+          This month&apos;s is already due, so it will be added{" "}
+          {isSupabaseConfigured ? "at the next daily run (just after midnight)" : "next time the app opens"}.
+        </p>
+      )}
       <div className="flex flex-wrap items-center justify-end gap-2">
         {bill && (
           <button
@@ -175,7 +223,14 @@ export function BillsManager() {
                   aria-label={`Edit bill ${tagName}`}
                 >
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium">{tagName}</span>
+                    <span className="flex items-center gap-1.5 truncate text-sm font-medium">
+                      {tagName}
+                      {bill.auto_log && (
+                        <span className="flex shrink-0 items-center gap-0.5 rounded-full border px-1.5 py-px text-[10px] font-medium text-muted-foreground">
+                          <Repeat className="h-2.5 w-2.5" /> Auto
+                        </span>
+                      )}
+                    </span>
                     <span className="block text-xs text-muted-foreground">{categoryLabel(categoryName)}</span>
                   </span>
                   <span className="shrink-0 text-right text-xs text-muted-foreground tabular-nums">

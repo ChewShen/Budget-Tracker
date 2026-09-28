@@ -9,6 +9,7 @@ import { KpiCards } from "@/components/kpi-cards";
 import { SpendHero } from "@/components/spend-hero";
 import { SalaryEngine } from "@/components/salary-engine";
 import { RecurringSentinel, type BillStatus } from "@/components/recurring-sentinel";
+import { canAutoLog } from "@/lib/bills";
 import { CategoryChart } from "@/components/category-chart";
 import { TagsBarChart } from "@/components/tags-bar-chart";
 import { LedgerTable } from "@/components/ledger-table";
@@ -125,8 +126,13 @@ export default function DashboardPage() {
         ? Math.round((new Date(dueDate + "T00:00:00").getTime() - new Date(todayStr + "T00:00:00").getTime()) / 86400000)
         : null;
 
+      // Auto bills are added by the daily job (or on open in local-only mode), so they aren't "due".
+      const isAuto = Boolean(bill.auto_log && canAutoLog(bill));
+
       let status: BillStatus = "missing";
       if (isLogged) status = "logged";
+      else if (isAuto && selectedMonth >= currentMonthStr)
+        status = selectedMonth > currentMonthStr || (daysLeft ?? 0) > 0 ? "auto" : "auto-pending";
       else if (selectedMonth > currentMonthStr) status = "upcoming";
       else if (selectedMonth === currentMonthStr) {
         if (daysLeft === null) status = "missing";
@@ -162,7 +168,7 @@ export default function DashboardPage() {
     selectedMonth > currentMonthStr
       ? []
       : billRows
-          .filter((r) => r.status !== "logged" && r.amount !== null)
+          .filter((r) => r.status !== "logged" && r.status !== "auto" && r.status !== "auto-pending" && r.amount !== null)
           .map((r) => ({ ...r, amount: r.amount as number }));
 
   const handleLogMissingBills = () => {

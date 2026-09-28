@@ -17,6 +17,7 @@ export interface RecurringBill {
   is_active: boolean;
   expected_amount?: number | null; // used by "Log missing bills" instead of last month's amount
   due_day?: number | null; // 1-31, clamped to the month's length
+  auto_log?: boolean; // added automatically on the due day (needs expected_amount + due_day)
 }
 
 export interface Transaction {

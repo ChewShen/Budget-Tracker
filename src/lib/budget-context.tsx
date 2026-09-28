@@ -11,6 +11,7 @@ import {
 } from "./mock-data";
 import { createClient } from "./supabase/client";
 import { isSupabaseConfigured } from "./supabase/config";
+import { dueAutoBills } from "./bills";
 
 export type NewTransaction = {
   amount: number;
@@ -21,7 +22,7 @@ export type NewTransaction = {
   is_one_off: boolean;
 };
 
-export type BillChanges = Partial<Pick<RecurringBill, "expected_amount" | "due_day" | "is_active">>;
+export type BillChanges = Partial<Pick<RecurringBill, "expected_amount" | "due_day" | "is_active" | "auto_log">>;
 
 // Bills the app used to hard-code; used to seed local-only mode.
 const DEFAULT_BILL_TAGS = [
@@ -223,6 +224,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
           is_active: b.is_active !== false,
           expected_amount: b.expected_amount == null ? null : Number(b.expected_amount),
           due_day: b.due_day ?? null,
+          auto_log: Boolean(b.auto_log),
         }))
       );
       if (prof.data) {
@@ -237,6 +239,30 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
       setIsLoaded(true);
     });
   }, []);
+
+  // Local-only mode has no scheduler: add due auto bills once when the app opens.
+  // (With Supabase, the daily pg_cron job does this; see scripts/migrations/2026-09-28_auto_bills.sql.)
+  const autoLogged = useRef(false);
+  useEffect(() => {
+    if (isSupabaseConfigured || !isLoaded || autoLogged.current) return;
+    autoLogged.current = true;
+    const due = dueAutoBills(bills, tags, transactions);
+    if (due.length === 0) return;
+    setTransactions((prev) => [
+      ...due.map((tx, i) => ({
+        ...tx,
+        id: `tx-auto-${Date.now()}-${i}`,
+        category_name: categories.find((c) => c.id === tx.category_id)?.name,
+        tag_name: tags.find((t) => t.id === tx.tag_id)?.name,
+      })),
+      ...prev,
+    ]);
+    showToast({
+      tone: "default",
+      message: `Auto-added ${due.length} monthly bill${due.length === 1 ? "" : "s"}`,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoaded]);
 
   // Offline cache for local-only mode.
   useEffect(() => {
@@ -487,7 +513,9 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
   // ---- Monthly bills (recurring_sentinel) ----
   const billError = (error: { code?: string }) =>
     error.code === "42703" || error.code === "PGRST204"
-      ? "Run scripts/migrations/2026-09-28_monthly_bills.sql in Supabase first."
+      ? "Run the monthly bills migrations (scripts/migrations/) in Supabase first."
+      : error.code === "23514"
+        ? "Auto-add needs an expected amount and a due day."
       : error.code === "23505"
         ? "That tag is already a monthly bill."
         : "Couldn't save the bill.";

@@ -3,10 +3,10 @@
 import { useState } from "react";
 import Link from "next/link";
 import { format, parseISO } from "date-fns";
-import { AlertCircle, Check, CircleDashed, Clock } from "lucide-react";
+import { AlertCircle, Check, CircleDashed, Clock, Repeat } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 
-export type BillStatus = "logged" | "overdue" | "due-soon" | "upcoming" | "missing";
+export type BillStatus = "logged" | "overdue" | "due-soon" | "upcoming" | "missing" | "auto" | "auto-pending";
 
 const formatDay = (date: string) => format(parseISO(date), "d MMM");
 
@@ -53,6 +53,18 @@ function StatusLabel({ row }: { row: BillRow }) {
           {row.daysLeft === 0 ? "Due today" : `Due in ${row.daysLeft} day${row.daysLeft === 1 ? "" : "s"}`}
         </span>
       );
+    case "auto":
+      return (
+        <span className="flex items-center gap-1 text-xs text-muted-foreground">
+          <Repeat className="h-3.5 w-3.5" /> {row.dueDate ? `Auto on ${formatDay(row.dueDate)}` : "Auto"}
+        </span>
+      );
+    case "auto-pending":
+      return (
+        <span className="flex items-center gap-1 text-xs text-muted-foreground">
+          <Repeat className="h-3.5 w-3.5" /> Auto-add pending
+        </span>
+      );
     case "upcoming":
       return (
         <span className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -72,7 +84,8 @@ export function RecurringSentinel({ items, loggableBills, onLogMissing }: Recurr
   const [isConfirming, setIsConfirming] = useState(false);
   const loggableTotal = loggableBills.reduce((sum, b) => sum + b.amount, 0);
   const loggedCount = items.filter((i) => i.status === "logged").length;
-  const notLogged = items.length - loggedCount;
+  const autoCount = items.filter((i) => i.status === "auto" || i.status === "auto-pending").length;
+  const notLogged = items.length - loggedCount - autoCount;
   const overdue = items.filter((i) => i.status === "overdue").length;
 
   if (items.length === 0) {
@@ -96,9 +109,14 @@ export function RecurringSentinel({ items, loggableBills, onLogMissing }: Recurr
         <div>
           <h3 className="text-[15px] font-semibold">Monthly bills</h3>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            {notLogged === 0
-              ? "Everything is logged"
-              : `${notLogged} not logged yet${overdue ? ` · ${overdue} overdue` : ""}`}
+            {[
+              notLogged === 0 && autoCount === 0 ? "Everything is logged" : null,
+              notLogged > 0 ? `${notLogged} not logged yet` : null,
+              overdue > 0 ? `${overdue} overdue` : null,
+              autoCount > 0 ? `${autoCount} automatic` : null,
+            ]
+              .filter(Boolean)
+              .join(" · ") || "Nothing left to log"}
           </p>
         </div>
         <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium tabular-nums">
