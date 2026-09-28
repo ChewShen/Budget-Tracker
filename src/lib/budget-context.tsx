@@ -8,6 +8,7 @@ import {
   INITIAL_TAGS,
   INITIAL_TRANSACTIONS,
   INITIAL_SAVINGS,
+  INITIAL_BILLS,
 } from "./mock-data";
 import { createClient } from "./supabase/client";
 import { isSupabaseConfigured } from "./supabase/config";
@@ -24,17 +25,6 @@ export type NewTransaction = {
 
 export type BillChanges = Partial<Pick<RecurringBill, "expected_amount" | "due_day" | "is_active" | "auto_log">>;
 
-// Bills the app used to hard-code; used to seed local-only mode.
-const DEFAULT_BILL_TAGS = [
-  "Netflix",
-  "iCloud",
-  "Youtube Premium",
-  "Youtube Membership",
-  "Cuckoo",
-  "Electric",
-  "Water",
-  "Season Parking",
-];
 
 export interface Toast {
   id: number;
@@ -124,15 +114,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [profile, setProfile] = useState<UserSalaryProfile>(DEFAULT_PROFILE);
   const [emergencyMonths, setEmergencyMonthsState] = useState(6);
-  const [bills, setBills] = useState<RecurringBill[]>(() =>
-    isSupabaseConfigured
-      ? []
-      : INITIAL_TAGS.filter((t) => DEFAULT_BILL_TAGS.includes(t.name)).map((t) => ({
-          id: `bill-${t.id}`,
-          tag_id: t.id,
-          is_active: true,
-        }))
-  );
+  const [bills, setBills] = useState<RecurringBill[]>(isSupabaseConfigured ? [] : INITIAL_BILLS);
   const [toast, setToast] = useState<Toast | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
