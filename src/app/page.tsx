@@ -10,7 +10,7 @@ import { SpendHero } from "@/components/spend-hero";
 import { SalaryEngine } from "@/components/salary-engine";
 import { RecurringSentinel, type BillStatus } from "@/components/recurring-sentinel";
 import { canAutoLog } from "@/lib/bills";
-import { monthForecast } from "@/lib/analytics";
+import { baseline, monthForecast, monthProgress } from "@/lib/analytics";
 import { CategoryChart } from "@/components/category-chart";
 import { TagsBarChart } from "@/components/tags-bar-chart";
 import { LedgerTable } from "@/components/ledger-table";
@@ -88,10 +88,16 @@ export default function DashboardPage() {
     const cName = t.category_name || "Others";
     catMap[cName] = (catMap[cName] || 0) + t.amount;
   });
+  // Compared with the 3-month average, pro-rated to today for the current month.
+  const categoryBaseline = baseline(transactions, selectedMonth, (t) => t.category_name || "Others");
+  const progress = monthProgress(selectedMonth, format(new Date(), "yyyy-MM-dd"));
   const categoryChartData = Object.entries(catMap)
     .map(([name, value]) => ({
       name,
       value: Math.round(value * 100) / 100,
+      usual: categoryBaseline.monthsUsed
+        ? Math.round((categoryBaseline.average.get(name) || 0) * progress * 100) / 100
+        : undefined,
     }))
     .sort((a, b) => b.value - a.value);
 
@@ -268,7 +274,11 @@ export default function DashboardPage() {
       />
 
       <div className="grid grid-cols-1 gap-4 sm:gap-5 lg:grid-cols-2">
-        <CategoryChart data={categoryChartData} />
+        <CategoryChart
+          data={categoryChartData}
+          baselineMonths={categoryBaseline.monthsUsed}
+          isMonthToDate={progress < 1}
+        />
         <TagsBarChart data={tagChartData} />
         <SalaryEngine
           gross={salaryMetrics.gross}
