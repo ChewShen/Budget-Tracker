@@ -67,12 +67,15 @@ const ICON_BY_NAME: Record<string, string> = {
   Others: "circle-dashed",
 };
 
+// The icon key a category currently shows: its saved icon, else the default for its name.
+export function categoryIconKey(name?: string, icon?: string | null): string {
+  if (icon && CATEGORY_ICON_OPTIONS[icon]) return icon;
+  if (name && ICON_BY_NAME[name]) return ICON_BY_NAME[name];
+  return "circle-dashed";
+}
+
 export function categoryIcon(name?: string, icon?: string | null): LucideIcon {
-  return (
-    (icon && CATEGORY_ICON_OPTIONS[icon]) ||
-    (name && CATEGORY_ICON_OPTIONS[ICON_BY_NAME[name]]) ||
-    CircleDashed
-  );
+  return CATEGORY_ICON_OPTIONS[categoryIconKey(name, icon)];
 }
 
 // "Home_Bills" -> "Home Bills"

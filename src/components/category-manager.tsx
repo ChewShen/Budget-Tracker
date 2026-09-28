@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Check, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useBudget } from "@/lib/budget-context";
-import { CATEGORY_ICON_OPTIONS, categoryIcon, categoryLabel } from "@/lib/categories";
+import { CATEGORY_ICON_OPTIONS, categoryIcon, categoryIconKey, categoryLabel } from "@/lib/categories";
 import { Category } from "@/lib/types";
 
 // Which inline editor is open (only one at a time).
@@ -54,7 +54,8 @@ function CategoryForm({
   onCancel: () => void;
 }) {
   const [name, setName] = useState(initial?.name ?? "");
-  const [icon, setIcon] = useState(initial?.icon || "circle-dashed");
+  // Preselect the icon currently shown, so renaming an imported category doesn't reset it.
+  const [icon, setIcon] = useState(categoryIconKey(initial?.name, initial?.icon));
   const [isBusy, setIsBusy] = useState(false);
 
   const submit = async (e: React.FormEvent) => {
