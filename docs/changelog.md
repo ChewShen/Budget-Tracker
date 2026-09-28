@@ -15,6 +15,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.10.0] - 2026-09-28
+
+### Added
+- **Month-end forecast**: "On pace for RM X by 30 Sep" under the month total, from everyday spending so far plus bills still to come.
+- **Compared with usual**: Each category shows how it compares with its average over up to 3 earlier months (pro-rated to today for the current month).
+- **Monthly spending trend**: Up to 6 months with an average line; the current month shows its forecast; tap a bar to open that month.
+- **Insights**: Up to three plain-English highlights, such as tags above or below usual, no-spend days and weekend-heavy spending.
+- **Fixed vs flexible**: The month split into everyday spending, bills and one-offs.
+- **Spending calendar**: Days shaded by how much they cost; tap a day for its total.
+- **Year to date**: Spent, saved, savings rate and average per month for the year so far.
+- **Export menu**: This month, all expenses, savings balances, or a full JSON backup; the Transactions page exports exactly what's shown.
+
+### Fixed
+- CSV exports quote fields properly (notes with commas or quotes no longer break columns), open in Excel with the right encoding, and no longer get cut off at a "#".
+- Text in exports that a spreadsheet would run as a formula is neutralised.
+
+---
+
 ## [0.9.0] - 2026-09-28
 
 ### Added
