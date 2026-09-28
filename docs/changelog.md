@@ -11,8 +11,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 - [ ] Flexible savings accounts (add, rename or remove accounts; per-account rate and liquid/locked type).
-- [ ] GitHub Actions check running `scripts/test_formulas.mjs` on pull requests.
 - [ ] Configure custom domain (optional).
+
+---
+
+## [0.6.1] - 2026-09-28
+
+### Added
+- **CI**: GitHub Actions workflow runs type-check, lint and the Excel formula parity test (`npm test`) on pull requests to `dev` and `main`.
+
+### Changed
+- Linting uses the ESLint CLI with a flat config (`eslint.config.mjs`), replacing the deprecated `next lint`.
+- Release docs now match the real CI, tagging (normal vs folded releases) and backup options.
+
+### Security
+- Updated Next.js to 15.5.26 and forced its bundled PostCSS to 8.5.x, resolving the high-severity PostCSS advisories (`npm audit`: 0 vulnerabilities).
 
 ---
 
