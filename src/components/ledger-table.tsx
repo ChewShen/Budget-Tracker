@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { format, parseISO } from "date-fns";
 import { Search, Trash2 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { CategoryIcon, categoryLabel } from "@/lib/categories";
@@ -14,14 +15,8 @@ interface LedgerTableProps {
   showFilters?: boolean;
 }
 
-function formatDayHeading(dateStr: string): string {
-  const date = new Date(dateStr + "T00:00:00");
-  return new Intl.DateTimeFormat("en-GB", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-  }).format(date);
-}
+// Fixed pattern (not the browser locale, which varies, e.g. "Sep" vs "Sept"): "Mon 31 Aug".
+const formatDayHeading = (dateStr: string) => format(parseISO(dateStr), "EEE d MMM");
 
 export function LedgerTable({
   transactions,

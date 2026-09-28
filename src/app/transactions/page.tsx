@@ -5,6 +5,8 @@ import { useBudget } from "@/lib/budget-context";
 import { LedgerTable } from "@/components/ledger-table";
 import { MonthSelector } from "@/components/month-selector";
 import { formatCurrency } from "@/lib/utils";
+import { Download } from "lucide-react";
+import { CSV, download, transactionsCsv } from "@/lib/export";
 import { cn } from "@/lib/utils";
 
 export default function TransactionsPage() {
@@ -13,6 +15,7 @@ export default function TransactionsPage() {
     selectedMonth,
     setSelectedMonth,
     deleteTransaction,
+    showToast,
   } = useBudget();
   const [filterByMonth, setFilterByMonth] = useState(true);
 
@@ -24,6 +27,15 @@ export default function TransactionsPage() {
     (sum, t) => sum + t.amount,
     0
   );
+
+  const exportShown = () => {
+    const name = filterByMonth ? `budget_expenses_${selectedMonth}.csv` : "budget_expenses_all.csv";
+    download(name, transactionsCsv(displayedTransactions), CSV);
+    showToast({
+      tone: "default",
+      message: `Exported ${displayedTransactions.length} expense${displayedTransactions.length === 1 ? "" : "s"}`,
+    });
+  };
 
   return (
     <div className="space-y-5">
@@ -65,6 +77,15 @@ export default function TransactionsPage() {
               onChangeMonth={setSelectedMonth}
             />
           )}
+          <button
+            onClick={exportShown}
+            disabled={displayedTransactions.length === 0}
+            className="flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-xs font-medium text-muted-foreground transition hover:bg-secondary hover:text-foreground disabled:opacity-40"
+            title="Download these expenses as CSV"
+          >
+            <Download className="h-4 w-4" />
+            Export CSV
+          </button>
         </div>
       </div>
 

@@ -3,6 +3,7 @@
 import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 import { formatCurrency } from "@/lib/utils";
+import type { MonthForecast } from "@/lib/analytics";
 
 interface DailySpend {
   day: number;
@@ -15,6 +16,8 @@ interface SpendHeroProps {
   previousSpend: number;
   transactionCount: number;
   daily: DailySpend[];
+  forecast: MonthForecast | null; // current month only
+  monthEndLabel: string; // e.g. "30 Sep"
 }
 
 function DailyTooltip({
@@ -46,6 +49,8 @@ export function SpendHero({
   previousSpend,
   transactionCount,
   daily,
+  forecast,
+  monthEndLabel,
 }: SpendHeroProps) {
   const hasComparison = previousSpend > 0;
   const deltaPct = hasComparison ? ((totalSpend - previousSpend) / previousSpend) * 100 : 0;
@@ -78,6 +83,19 @@ export function SpendHero({
           </span>
         </div>
       </div>
+
+      {forecast && forecast.daysLeft > 0 && (
+        <p className="mt-3 text-sm text-muted-foreground">
+          On pace for{" "}
+          <span className="font-semibold text-foreground tabular-nums">{formatCurrency(forecast.projected)}</span> by{" "}
+          {monthEndLabel}
+          <span className="block text-xs sm:inline">
+            <span className="hidden sm:inline"> · </span>
+            {formatCurrency(forecast.flexibleDaily)}/day everyday spending
+            {forecast.billsToCome > 0 && ` + ${formatCurrency(forecast.billsToCome)} bills to come`}
+          </span>
+        </p>
+      )}
 
       <div className="mt-6 h-28 w-full sm:h-32" aria-label={`Daily spend in ${monthLabel}`}>
         <ResponsiveContainer width="100%" height="100%">

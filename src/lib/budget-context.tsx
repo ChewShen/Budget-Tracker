@@ -2,7 +2,7 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { format } from "date-fns";
-import { Category, Tag, Transaction, MonthlySavings, UserSalaryProfile } from "./types";
+import { Category, Tag, Transaction, MonthlySavings, RecurringBill, UserSalaryProfile } from "./types";
 import {
   INITIAL_CATEGORIES,
   INITIAL_TAGS,
@@ -11,6 +11,7 @@ import {
 } from "./mock-data";
 import { createClient } from "./supabase/client";
 import { isSupabaseConfigured } from "./supabase/config";
+import { dueAutoBills } from "./bills";
 
 export type NewTransaction = {
   amount: number;
@@ -20,6 +21,20 @@ export type NewTransaction = {
   description?: string;
   is_one_off: boolean;
 };
+
+export type BillChanges = Partial<Pick<RecurringBill, "expected_amount" | "due_day" | "is_active" | "auto_log">>;
+
+// Bills the app used to hard-code; used to seed local-only mode.
+const DEFAULT_BILL_TAGS = [
+  "Netflix",
+  "iCloud",
+  "Youtube Premium",
+  "Youtube Membership",
+  "Cuckoo",
+  "Electric",
+  "Water",
+  "Season Parking",
+];
 
 export interface Toast {
   id: number;
@@ -51,6 +66,16 @@ interface BudgetContextType {
   toast: Toast | null;
   showToast: (toast: Omit<Toast, "id">) => void;
   dismissToast: () => void;
+  bills: RecurringBill[];
+  addBill: (tagId: string, changes?: BillChanges) => Promise<boolean>;
+  updateBill: (id: string, changes: BillChanges) => Promise<boolean>;
+  removeBill: (id: string) => Promise<boolean>;
+  addCategory: (name: string, icon: string) => Promise<Category | null>;
+  renameCategory: (id: string, name: string, icon?: string) => Promise<boolean>;
+  deleteCategory: (id: string) => Promise<boolean>;
+  addTag: (categoryId: string, name: string) => Promise<Tag | null>;
+  renameTag: (id: string, name: string) => Promise<boolean>;
+  deleteTag: (id: string) => Promise<boolean>;
   signOut: () => Promise<void>;
   isSyncedWithSupabase: boolean;
   isLoaded: boolean;
@@ -63,7 +88,19 @@ const STORAGE_KEYS = {
   TRANSACTIONS: "budget_tracker_transactions",
   SAVINGS: "budget_tracker_savings",
   PROFILE: "budget_tracker_profile",
+  CATEGORIES: "budget_tracker_categories",
+  TAGS: "budget_tracker_tags",
+  BILLS: "budget_tracker_bills",
 };
+
+// Turns a Supabase/Postgres error into a message the user can act on.
+function describeDbError(error: { code?: string; message?: string }, what: string): string {
+  if (error.code === "23505") return `${what} already exists.`;
+  if (error.code === "23503") return `${what} is still used by expenses.`;
+  if (error.code === "42501")
+    return "Not allowed yet: run scripts/migrations/2026-09-28_manage_categories_tags.sql in Supabase.";
+  return `Couldn't save ${what.toLowerCase()}.`;
+}
 
 const UNDO_MS = 5000;
 
@@ -83,6 +120,15 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
   const [isLoaded, setIsLoaded] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [profile, setProfile] = useState<UserSalaryProfile>(DEFAULT_PROFILE);
+  const [bills, setBills] = useState<RecurringBill[]>(() =>
+    isSupabaseConfigured
+      ? []
+      : INITIAL_TAGS.filter((t) => DEFAULT_BILL_TAGS.includes(t.name)).map((t) => ({
+          id: `bill-${t.id}`,
+          tag_id: t.id,
+          is_active: true,
+        }))
+  );
   const [toast, setToast] = useState<Toast | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -107,6 +153,12 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
         if (savedTx) setTransactions(JSON.parse(savedTx));
         const savedSv = localStorage.getItem(STORAGE_KEYS.SAVINGS);
         if (savedSv) setSavings(JSON.parse(savedSv));
+        const savedCats = localStorage.getItem(STORAGE_KEYS.CATEGORIES);
+        if (savedCats) setCategories(JSON.parse(savedCats));
+        const savedTags = localStorage.getItem(STORAGE_KEYS.TAGS);
+        if (savedTags) setTags(JSON.parse(savedTags));
+        const savedBills = localStorage.getItem(STORAGE_KEYS.BILLS);
+        if (savedBills) setBills(JSON.parse(savedBills));
         const savedProfile = localStorage.getItem(STORAGE_KEYS.PROFILE);
         if (savedProfile) setProfile({ ...DEFAULT_PROFILE, ...JSON.parse(savedProfile) });
       } catch (e) {
@@ -137,7 +189,8 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
         .from("user_profiles")
         .select("default_gross_salary, epf_rate, socso_rate, eis_rate")
         .maybeSingle(),
-    ]).then(([cats, tgs, txs, svs, prof]) => {
+      supabase.from("recurring_sentinel").select("*"),
+    ]).then(([cats, tgs, txs, svs, prof, bls]) => {
       const error = cats.error || tgs.error || txs.error || svs.error;
       if (error) {
         console.error("Supabase load error:", error);
@@ -162,6 +215,18 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
         }))
       );
       setSavings(svs.data || []);
+      // Bills are optional: before the monthly-bills migration some columns are missing, but rows still load.
+      if (bls.error) console.error("Supabase bills load error:", bls.error);
+      setBills(
+        (bls.data || []).map((b: any) => ({
+          id: b.id,
+          tag_id: b.tag_id,
+          is_active: b.is_active !== false,
+          expected_amount: b.expected_amount == null ? null : Number(b.expected_amount),
+          due_day: b.due_day ?? null,
+          auto_log: Boolean(b.auto_log),
+        }))
+      );
       if (prof.data) {
         setProfile({
           default_gross_salary: Number(prof.data.default_gross_salary ?? DEFAULT_PROFILE.default_gross_salary),
@@ -175,6 +240,30 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  // Local-only mode has no scheduler: add due auto bills once when the app opens.
+  // (With Supabase, the daily pg_cron job does this; see scripts/migrations/2026-09-28_auto_bills.sql.)
+  const autoLogged = useRef(false);
+  useEffect(() => {
+    if (isSupabaseConfigured || !isLoaded || autoLogged.current) return;
+    autoLogged.current = true;
+    const due = dueAutoBills(bills, tags, transactions);
+    if (due.length === 0) return;
+    setTransactions((prev) => [
+      ...due.map((tx, i) => ({
+        ...tx,
+        id: `tx-auto-${Date.now()}-${i}`,
+        category_name: categories.find((c) => c.id === tx.category_id)?.name,
+        tag_name: tags.find((t) => t.id === tx.tag_id)?.name,
+      })),
+      ...prev,
+    ]);
+    showToast({
+      tone: "default",
+      message: `Auto-added ${due.length} monthly bill${due.length === 1 ? "" : "s"}`,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoaded]);
+
   // Offline cache for local-only mode.
   useEffect(() => {
     if (isSupabaseConfigured || !isLoaded) return;
@@ -182,10 +271,13 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(transactions));
       localStorage.setItem(STORAGE_KEYS.SAVINGS, JSON.stringify(savings));
       localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(profile));
+      localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(categories));
+      localStorage.setItem(STORAGE_KEYS.TAGS, JSON.stringify(tags));
+      localStorage.setItem(STORAGE_KEYS.BILLS, JSON.stringify(bills));
     } catch (e) {
       console.error("Failed to save to localStorage", e);
     }
-  }, [transactions, savings, profile, isLoaded]);
+  }, [transactions, savings, profile, categories, tags, bills, isLoaded]);
 
   const addTransaction = async (txInput: NewTransaction) => {
     const cat = categories.find((c) => c.id === txInput.category_id);
@@ -418,6 +510,217 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // ---- Monthly bills (recurring_sentinel) ----
+  const billError = (error: { code?: string }) =>
+    error.code === "42703" || error.code === "PGRST204"
+      ? "Run the monthly bills migrations (scripts/migrations/) in Supabase first."
+      : error.code === "23514"
+        ? "Auto-add needs an expected amount and a due day."
+      : error.code === "23505"
+        ? "That tag is already a monthly bill."
+        : "Couldn't save the bill.";
+
+  const addBill = async (tagId: string, changes: BillChanges = {}) => {
+    if (bills.some((b) => b.tag_id === tagId)) {
+      showToast({ tone: "error", message: "That tag is already a monthly bill." });
+      return false;
+    }
+    let created: RecurringBill = { id: `bill-${Date.now()}`, tag_id: tagId, is_active: true, ...changes };
+    if (isSupabaseConfigured) {
+      const { data, error } = await createClient()
+        .from("recurring_sentinel")
+        .insert({ tag_id: tagId, is_active: true, ...changes })
+        .select()
+        .single();
+      if (error || !data) {
+        console.error("Supabase bill insert error:", error);
+        showToast({ tone: "error", message: billError(error || {}) });
+        return false;
+      }
+      created = { ...data, expected_amount: data.expected_amount == null ? null : Number(data.expected_amount) };
+    }
+    setBills((prev) => [...prev, created]);
+    return true;
+  };
+
+  const updateBill = async (id: string, changes: BillChanges) => {
+    if (isSupabaseConfigured) {
+      const { error } = await createClient().from("recurring_sentinel").update(changes).eq("id", id);
+      if (error) {
+        console.error("Supabase bill update error:", error);
+        showToast({ tone: "error", message: billError(error) });
+        return false;
+      }
+    }
+    setBills((prev) => prev.map((b) => (b.id === id ? { ...b, ...changes } : b)));
+    return true;
+  };
+
+  const removeBill = async (id: string) => {
+    if (isSupabaseConfigured) {
+      const { error } = await createClient().from("recurring_sentinel").delete().eq("id", id);
+      if (error) {
+        console.error("Supabase bill delete error:", error);
+        showToast({ tone: "error", message: billError(error) });
+        return false;
+      }
+    }
+    setBills((prev) => prev.filter((b) => b.id !== id));
+    return true;
+  };
+
+  // ---- Categories & tags ----
+  // Creation waits for the database (the new id is needed right away); edits are applied after success.
+  const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name);
+
+  const addCategory = async (rawName: string, icon: string) => {
+    const name = rawName.trim();
+    if (!name) return null;
+    if (categories.some((c) => c.name.toLowerCase() === name.toLowerCase())) {
+      showToast({ tone: "error", message: `Category "${name}" already exists.` });
+      return null;
+    }
+    let created: Category = { id: `cat-${Date.now()}`, name, icon };
+    if (isSupabaseConfigured) {
+      const { data, error } = await createClient().from("categories").insert({ name, icon }).select().single();
+      if (error || !data) {
+        console.error("Supabase category insert error:", error);
+        showToast({ tone: "error", message: describeDbError(error || {}, `Category "${name}"`) });
+        return null;
+      }
+      created = data;
+    }
+    setCategories((prev) => [...prev, created].sort(byName));
+    return created;
+  };
+
+  const renameCategory = async (id: string, rawName: string, icon?: string) => {
+    const name = rawName.trim();
+    const current = categories.find((c) => c.id === id);
+    if (!name || !current) return false;
+    if (categories.some((c) => c.id !== id && c.name.toLowerCase() === name.toLowerCase())) {
+      showToast({ tone: "error", message: `Category "${name}" already exists.` });
+      return false;
+    }
+    const changes = { name, icon: icon ?? current.icon ?? null };
+    if (isSupabaseConfigured) {
+      const { error } = await createClient().from("categories").update(changes).eq("id", id);
+      if (error) {
+        console.error("Supabase category update error:", error);
+        showToast({ tone: "error", message: describeDbError(error, `Category "${name}"`) });
+        return false;
+      }
+    }
+    setCategories((prev) => prev.map((c) => (c.id === id ? { ...c, ...changes } : c)).sort(byName));
+    setTransactions((prev) => prev.map((t) => (t.category_id === id ? { ...t, category_name: name } : t)));
+    return true;
+  };
+
+  const deleteCategory = async (id: string) => {
+    const current = categories.find((c) => c.id === id);
+    if (!current) return false;
+    const used = transactions.filter((t) => t.category_id === id).length;
+    if (used > 0) {
+      showToast({
+        tone: "error",
+        message: `${current.name} is used by ${used} expense${used === 1 ? "" : "s"}. Rename it instead.`,
+      });
+      return false;
+    }
+    const billTag = tags.find((t) => t.category_id === id && bills.some((b) => b.tag_id === t.id));
+    if (billTag) {
+      showToast({ tone: "error", message: `${billTag.name} is a monthly bill. Remove it from Monthly bills first.` });
+      return false;
+    }
+    if (isSupabaseConfigured) {
+      // Tags cascade with the category.
+      const { error } = await createClient().from("categories").delete().eq("id", id);
+      if (error) {
+        console.error("Supabase category delete error:", error);
+        showToast({ tone: "error", message: describeDbError(error, current.name) });
+        return false;
+      }
+    }
+    setCategories((prev) => prev.filter((c) => c.id !== id));
+    setTags((prev) => prev.filter((t) => t.category_id !== id));
+    showToast({ tone: "default", message: `Deleted category ${current.name}` });
+    return true;
+  };
+
+  const addTag = async (categoryId: string, rawName: string) => {
+    const name = rawName.trim();
+    if (!name || !categoryId) return null;
+    if (tags.some((t) => t.category_id === categoryId && t.name.toLowerCase() === name.toLowerCase())) {
+      showToast({ tone: "error", message: `Tag "${name}" already exists in this category.` });
+      return null;
+    }
+    let created: Tag = { id: `tag-${Date.now()}`, category_id: categoryId, name };
+    if (isSupabaseConfigured) {
+      const { data, error } = await createClient()
+        .from("tags")
+        .insert({ category_id: categoryId, name })
+        .select()
+        .single();
+      if (error || !data) {
+        console.error("Supabase tag insert error:", error);
+        showToast({ tone: "error", message: describeDbError(error || {}, `Tag "${name}"`) });
+        return null;
+      }
+      created = data;
+    }
+    setTags((prev) => [...prev, created].sort(byName));
+    return created;
+  };
+
+  const renameTag = async (id: string, rawName: string) => {
+    const name = rawName.trim();
+    const current = tags.find((t) => t.id === id);
+    if (!name || !current) return false;
+    if (tags.some((t) => t.id !== id && t.category_id === current.category_id && t.name.toLowerCase() === name.toLowerCase())) {
+      showToast({ tone: "error", message: `Tag "${name}" already exists in this category.` });
+      return false;
+    }
+    if (isSupabaseConfigured) {
+      const { error } = await createClient().from("tags").update({ name }).eq("id", id);
+      if (error) {
+        console.error("Supabase tag update error:", error);
+        showToast({ tone: "error", message: describeDbError(error, `Tag "${name}"`) });
+        return false;
+      }
+    }
+    setTags((prev) => prev.map((t) => (t.id === id ? { ...t, name } : t)).sort(byName));
+    setTransactions((prev) => prev.map((t) => (t.tag_id === id ? { ...t, tag_name: name } : t)));
+    return true;
+  };
+
+  const deleteTag = async (id: string) => {
+    const current = tags.find((t) => t.id === id);
+    if (!current) return false;
+    const used = transactions.filter((t) => t.tag_id === id).length;
+    if (used > 0) {
+      showToast({
+        tone: "error",
+        message: `${current.name} is used by ${used} expense${used === 1 ? "" : "s"}. Rename it instead.`,
+      });
+      return false;
+    }
+    if (bills.some((b) => b.tag_id === id)) {
+      showToast({ tone: "error", message: `${current.name} is a monthly bill. Remove it from Monthly bills first.` });
+      return false;
+    }
+    if (isSupabaseConfigured) {
+      const { error } = await createClient().from("tags").delete().eq("id", id);
+      if (error) {
+        console.error("Supabase tag delete error:", error);
+        showToast({ tone: "error", message: describeDbError(error, current.name) });
+        return false;
+      }
+    }
+    setTags((prev) => prev.filter((t) => t.id !== id));
+    showToast({ tone: "default", message: `Deleted tag ${current.name}` });
+    return true;
+  };
+
   const signOut = async () => {
     if (!isSupabaseConfigured) return;
     await createClient().auth.signOut();
@@ -442,6 +745,16 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
         toast,
         showToast,
         dismissToast,
+        bills,
+        addBill,
+        updateBill,
+        removeBill,
+        addCategory,
+        renameCategory,
+        deleteCategory,
+        addTag,
+        renameTag,
+        deleteTag,
         signOut,
         isSyncedWithSupabase,
         isLoaded,

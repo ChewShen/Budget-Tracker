@@ -15,6 +15,68 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.10.0] - 2026-09-28
+
+### Added
+- **Month-end forecast**: "On pace for RM X by 30 Sep" under the month total, from everyday spending so far plus bills still to come.
+- **Compared with usual**: Each category shows how it compares with its average over up to 3 earlier months (pro-rated to today for the current month).
+- **Monthly spending trend**: Up to 6 months with an average line; the current month shows its forecast; tap a bar to open that month.
+- **Insights**: Up to three plain-English highlights, such as tags above or below usual, no-spend days and weekend-heavy spending.
+- **Fixed vs flexible**: The month split into everyday spending, bills and one-offs.
+- **Spending calendar**: Days shaded by how much they cost; tap a day for its total.
+- **Year to date**: Spent, saved, savings rate and average per month for the year so far.
+- **Export menu**: This month, all expenses, savings balances, or a full JSON backup; the Transactions page exports exactly what's shown.
+
+### Fixed
+- CSV exports quote fields properly (notes with commas or quotes no longer break columns), open in Excel with the right encoding, and no longer get cut off at a "#".
+- Text in exports that a spreadsheet would run as a formula is neutralised.
+
+---
+
+## [0.9.0] - 2026-09-28
+
+### Added
+- **Automatic bills**: Switch on "Add automatically" for a bill with an expected amount and due day, and its expense is added on the due day each month (noted "Auto-added monthly bill"), unless you've already logged it.
+- Overview shows automatic bills as "Auto on <date>" and counts them separately; Settings marks them with an Auto badge.
+
+### Database
+- New migration `scripts/migrations/2026-09-28_auto_bills.sql` (run once in Supabase, needs the `pg_cron` extension): adds the per-bill switch, the `auto_log_bills()` function and a daily job at 00:05 Malaysia time.
+
+---
+
+## [0.8.0] - 2026-09-28
+
+### Added
+- **Editable monthly bills** (Settings → Monthly bills): choose which tags are monthly bills, with an optional expected amount and due day.
+- **Bill due status** on Overview: Overdue, Due in N days, Due on a date, Missing or Logged, with an overdue count.
+
+### Changed
+- Bills are linked to the tag rather than its name, so renaming a tag keeps its bill.
+- "Log unpaid bills" uses the expected amount on the due day when set, otherwise last month's payment.
+
+### Fixed
+- Renaming an imported category no longer resets its icon.
+- Dates always use the same month format ("Sep", not sometimes "Sept").
+
+### Database
+- New migration `scripts/migrations/2026-09-28_monthly_bills.sql` (run once in Supabase): adds expected amount and due day to `recurring_sentinel`, one row per bill, and carries over the 8 existing bills.
+
+---
+
+## [0.7.0] - 2026-09-28
+
+### Added
+- **Categories & tags in Settings**: Add categories with an icon, add tags, rename either, and delete ones no expense uses. Items in use show how many expenses use them and can only be renamed.
+- **"+ New tag" in Add expense**: Create a tag without leaving the sheet; it is selected straight away.
+
+### Changed
+- Categories are listed alphabetically.
+
+### Database
+- New migration `scripts/migrations/2026-09-28_manage_categories_tags.sql` (run once in Supabase): adds `categories.icon` and lets the signed-in owner add, rename and delete categories and tags.
+
+---
+
 ## [0.6.1] - 2026-09-28
 
 ### Added

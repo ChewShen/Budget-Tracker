@@ -2,12 +2,22 @@ export interface Category {
   id: string;
   name: string;
   color?: string;
+  icon?: string | null; // key into CATEGORY_ICON_OPTIONS; null = pick by name
 }
 
 export interface Tag {
   id: string;
   category_id: string;
   name: string;
+}
+
+export interface RecurringBill {
+  id: string;
+  tag_id: string;
+  is_active: boolean;
+  expected_amount?: number | null; // used by "Log missing bills" instead of last month's amount
+  due_day?: number | null; // 1-31, clamped to the month's length
+  auto_log?: boolean; // added automatically on the due day (needs expected_amount + due_day)
 }
 
 export interface Transaction {

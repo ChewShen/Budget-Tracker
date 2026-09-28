@@ -1,32 +1,81 @@
+"use client";
+
 import {
+  Baby,
+  BookOpen,
+  Briefcase,
   Car,
   CircleDashed,
   Clapperboard,
+  Coffee,
+  Dumbbell,
+  Fuel,
+  Gift,
+  GraduationCap,
   HeartPulse,
   Home,
   Music,
+  PawPrint,
+  Plane,
   Repeat,
   ShoppingBag,
+  Smartphone,
   Sparkles,
   Utensils,
+  Wallet,
   type LucideIcon,
 } from "lucide-react";
+import { useBudget } from "@/lib/budget-context";
 
-const CATEGORY_ICONS: Record<string, LucideIcon> = {
-  Food: Utensils,
-  Transport: Car,
-  Home_Bills: Home,
-  Self_care: Sparkles,
-  Subscription: Repeat,
-  Health: HeartPulse,
-  Own_Interest: Music,
-  Entertainment: Clapperboard,
-  Shopping: ShoppingBag,
-  Others: CircleDashed,
+// Icons a category can use. Keys are stored in categories.icon.
+export const CATEGORY_ICON_OPTIONS: Record<string, LucideIcon> = {
+  utensils: Utensils,
+  coffee: Coffee,
+  car: Car,
+  fuel: Fuel,
+  home: Home,
+  repeat: Repeat,
+  smartphone: Smartphone,
+  sparkles: Sparkles,
+  "heart-pulse": HeartPulse,
+  dumbbell: Dumbbell,
+  music: Music,
+  clapperboard: Clapperboard,
+  "shopping-bag": ShoppingBag,
+  gift: Gift,
+  plane: Plane,
+  "book-open": BookOpen,
+  "graduation-cap": GraduationCap,
+  briefcase: Briefcase,
+  wallet: Wallet,
+  baby: Baby,
+  "paw-print": PawPrint,
+  "circle-dashed": CircleDashed,
 };
 
-export function categoryIcon(name?: string): LucideIcon {
-  return (name && CATEGORY_ICONS[name]) || CircleDashed;
+// Fallback for categories created before icons were selectable (the Excel import).
+const ICON_BY_NAME: Record<string, string> = {
+  Food: "utensils",
+  Transport: "car",
+  Home_Bills: "home",
+  Self_care: "sparkles",
+  Subscription: "repeat",
+  Health: "heart-pulse",
+  Own_Interest: "music",
+  Entertainment: "clapperboard",
+  Shopping: "shopping-bag",
+  Others: "circle-dashed",
+};
+
+// The icon key a category currently shows: its saved icon, else the default for its name.
+export function categoryIconKey(name?: string, icon?: string | null): string {
+  if (icon && CATEGORY_ICON_OPTIONS[icon]) return icon;
+  if (name && ICON_BY_NAME[name]) return ICON_BY_NAME[name];
+  return "circle-dashed";
+}
+
+export function categoryIcon(name?: string, icon?: string | null): LucideIcon {
+  return CATEGORY_ICON_OPTIONS[categoryIconKey(name, icon)];
 }
 
 // "Home_Bills" -> "Home Bills"
@@ -41,7 +90,9 @@ export function CategoryIcon({
   name?: string;
   className?: string;
 }) {
-  const Icon = categoryIcon(name);
+  // Transactions only carry the category name, so look up the chosen icon here.
+  const { categories } = useBudget();
+  const Icon = categoryIcon(name, categories.find((c) => c.name === name)?.icon);
   return (
     <span
       className={`flex shrink-0 items-center justify-center rounded-full bg-secondary text-foreground/80 ${className}`}
