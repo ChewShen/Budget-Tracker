@@ -1,5 +1,6 @@
-import { getDaysInMonth, parseISO } from "date-fns";
+import { format, getDaysInMonth, parseISO } from "date-fns";
 import { Transaction } from "./types";
+import { formatCurrency as rm } from "./utils";
 
 // Pure helpers behind the Overview analytics. Months are "YYYY-MM"; dates "YYYY-MM-DD".
 
@@ -92,4 +93,106 @@ export function monthlyTotals(txs: Transaction[], endMonth: string, n = 6): Mont
   }));
   const first = totals.findIndex((m) => m.total > 0);
   return first === -1 ? totals.slice(-1) : totals.slice(first);
+}
+
+export interface Insight {
+  id: string;
+  tone: "up" | "down" | "neutral"; // up = spending more than usual (bad), down = less (good)
+  title: string;
+  detail?: string;
+  score: number; // how notable; the card shows the top few
+}
+
+const isWeekend = (date: string) => [0, 6].includes(parseISO(date).getDay());
+
+// Plain-English highlights for a month, most notable first.
+export function monthInsights(txs: Transaction[], month: string, today: string, limit = 3): Insight[] {
+  const monthTxs = txs.filter((t) => t.date.startsWith(month));
+  if (monthTxs.length === 0) return [];
+  const total = sumAmounts(monthTxs);
+  const progress = monthProgress(month, today);
+  const isCurrent = today.slice(0, 7) === month;
+  const out: Insight[] = [];
+
+  // 1-2. Tags furthest above / below their usual (pro-rated for the current month).
+  const tagBase = baseline(txs, month, (t) => t.tag_name || "Other");
+  if (tagBase.monthsUsed > 0) {
+    const byTag = new Map<string, number>();
+    monthTxs.forEach((t) => byTag.set(t.tag_name || "Other", (byTag.get(t.tag_name || "Other") || 0) + t.amount));
+    const names = new Set([...byTag.keys(), ...tagBase.average.keys()]);
+    const diffs = [...names].map((name) => {
+      const usual = (tagBase.average.get(name) || 0) * progress;
+      return { name, usual, diff: (byTag.get(name) || 0) - usual };
+    });
+    const notable = (d: { usual: number; diff: number }) => Math.abs(d.diff) >= Math.max(30, d.usual * 0.25);
+    const up = diffs.filter((d) => d.diff > 0 && notable(d)).sort((a, b) => b.diff - a.diff)[0];
+    const down = diffs.filter((d) => d.diff < 0 && notable(d)).sort((a, b) => a.diff - b.diff)[0];
+    const basis = tagBase.monthsUsed === 1 ? "last month" : `your ${tagBase.monthsUsed}-month average`;
+    if (up)
+      out.push({
+        id: "tag-up",
+        tone: "up",
+        title: `${up.name} is ${rm(up.diff)} above usual`,
+        detail: `Compared with ${basis}${isCurrent ? " by this point in the month" : ""}.`,
+        score: up.diff,
+      });
+    if (down)
+      out.push({
+        id: "tag-down",
+        tone: "down",
+        title: `${down.name} is ${rm(-down.diff)} below usual`,
+        detail: `Compared with ${basis}${isCurrent ? " by this point in the month" : ""}.`,
+        score: -down.diff * 0.8,
+      });
+  }
+
+  // 3. No-spend days so far.
+  const lastDay = isCurrent ? Number(today.slice(8, 10)) : getDaysInMonth(parseISO(`${month}-01`));
+  const spentDays = new Set(monthTxs.map((t) => Number(t.date.slice(8, 10))));
+  const noSpend = Array.from({ length: lastDay }, (_, i) => i + 1).filter((d) => !spentDays.has(d)).length;
+  if (noSpend > 0)
+    out.push({
+      id: "no-spend",
+      tone: "down",
+      title: `${noSpend} no-spend day${noSpend === 1 ? "" : "s"}${isCurrent ? " so far" : ""}`,
+      detail: `Out of ${lastDay} day${lastDay === 1 ? "" : "s"}${isCurrent ? " this month" : ""}.`,
+      score: 25 + noSpend * 8,
+    });
+
+  // 4. Weekend-heavy spending (weekends are 2 of 7 days, about 29%).
+  const weekendShare = sumAmounts(monthTxs.filter((t) => isWeekend(t.date))) / total;
+  if (weekendShare >= 0.45)
+    out.push({
+      id: "weekend",
+      tone: "neutral",
+      title: `Weekends are ${Math.round(weekendShare * 100)}% of your spending`,
+      detail: "Saturdays and Sundays are only 2 of every 7 days.",
+      score: (weekendShare - 0.29) * 300,
+    });
+
+  // 5. One-offs making up a big share.
+  const oneOff = sumAmounts(monthTxs.filter((t) => t.is_one_off));
+  if (oneOff / total >= 0.2)
+    out.push({
+      id: "one-off",
+      tone: "neutral",
+      title: `One-offs are ${Math.round((oneOff / total) * 100)}% of this month`,
+      detail: `${rm(oneOff)} marked as one-off, left out of your daily average.`,
+      score: (oneOff / total) * 150,
+    });
+
+  // 6. Biggest day (fallback so there's always something to show).
+  const byDay = new Map<string, number>();
+  monthTxs.forEach((t) => byDay.set(t.date, (byDay.get(t.date) || 0) + t.amount));
+  const [bigDate, bigAmount] = [...byDay.entries()].sort((a, b) => b[1] - a[1])[0];
+  const bigTop = monthTxs.filter((t) => t.date === bigDate).sort((a, b) => b.amount - a.amount)[0];
+  out.push({
+    id: "biggest-day",
+    tone: "neutral",
+    title: `Biggest day: ${format(parseISO(bigDate), "EEE d MMM")}, ${rm(bigAmount)}`,
+    detail: bigTop?.tag_name ? `Mostly ${bigTop.tag_name} (${rm(bigTop.amount)}).` : undefined,
+    score: 10,
+  });
+
+  return out.sort((a, b) => b.score - a.score).slice(0, limit);
 }

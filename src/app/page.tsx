@@ -10,7 +10,8 @@ import { SpendHero } from "@/components/spend-hero";
 import { SalaryEngine } from "@/components/salary-engine";
 import { RecurringSentinel, type BillStatus } from "@/components/recurring-sentinel";
 import { canAutoLog } from "@/lib/bills";
-import { baseline, monthForecast, monthProgress, monthlyTotals } from "@/lib/analytics";
+import { baseline, monthForecast, monthInsights, monthProgress, monthlyTotals } from "@/lib/analytics";
+import { InsightsCard } from "@/components/insights-card";
 import { SpendingTrend } from "@/components/spending-trend";
 import { CategoryChart } from "@/components/category-chart";
 import { TagsBarChart } from "@/components/tags-bar-chart";
@@ -283,6 +284,8 @@ export default function DashboardPage() {
         largestExpense={largestExpense}
         savingsRate={salaryMetrics.savingsRate}
       />
+
+      <InsightsCard insights={monthInsights(transactions, selectedMonth, todayStr)} />
 
       <SpendingTrend
         data={trend}
