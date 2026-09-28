@@ -10,9 +10,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned
-- [ ] Trigger Vercel deployment of v0.4.0.
-- [ ] Add PWA icons (`public/icon-192.png`, `public/icon-512.png`) referenced by the manifest.
-- [ ] Configure custom domain (optional) and install PWA on mobile device.
+- [ ] Savings page fixes: carry balances forward, "not recorded" months, growth and untracked cash, net worth trend.
+- [ ] GitHub Actions check running `scripts/test_formulas.mjs` on pull requests.
+- [ ] Configure custom domain (optional).
+
+---
+
+## [0.5.0] - 2026-09-28
+
+### Added
+- **Edit expenses**: Tap any transaction to open it in the add sheet, pre-filled. Save changes updates it in place; Delete removes it with the 5-second Undo. Failed edits roll back with a Retry toast.
+- **App icons**: Home-screen icons for iOS (`apple-icon.png`) and Android/manifest (192px, 512px, maskable), plus a browser favicon.
+
+### Fixed
+- The add sheet now always opens empty, so an amount or note typed earlier can't carry over into a new expense.
 
 ---
 
