@@ -8,6 +8,7 @@ import { useBudget } from "@/lib/budget-context";
 import { MonthSelector } from "@/components/month-selector";
 import { BalancesSheet } from "@/components/balances-sheet";
 import { EmergencyFundCard } from "@/components/emergency-fund";
+import { AccountChanges } from "@/components/account-changes";
 import { formatCurrency } from "@/lib/utils";
 import {
   calculateDigitalBankInterest,
@@ -190,6 +191,14 @@ export default function SavingsPage() {
           onChangeGoal={setEmergencyMonths}
           pace={pace}
           reachBy={reachBy}
+        />
+      )}
+
+      {current && lastRecorded && (
+        <AccountChanges
+          current={current}
+          previous={lastRecorded}
+          previousLabel={format(parse(lastRecorded.month, "yyyy-MM-dd", new Date()), "MMMM")}
         />
       )}
 
