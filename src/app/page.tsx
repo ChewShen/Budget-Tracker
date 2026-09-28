@@ -10,7 +10,8 @@ import { SpendHero } from "@/components/spend-hero";
 import { SalaryEngine } from "@/components/salary-engine";
 import { RecurringSentinel, type BillStatus } from "@/components/recurring-sentinel";
 import { canAutoLog } from "@/lib/bills";
-import { baseline, monthForecast, monthInsights, monthProgress, monthlyTotals } from "@/lib/analytics";
+import { baseline, monthForecast, monthInsights, monthProgress, monthlyTotals, spendSplit } from "@/lib/analytics";
+import { SpendSplitCard } from "@/components/spend-split";
 import { InsightsCard } from "@/components/insights-card";
 import { SpendingTrend } from "@/components/spending-trend";
 import { CategoryChart } from "@/components/category-chart";
@@ -115,6 +116,7 @@ export default function DashboardPage() {
   }));
 
   // 7. Monthly bills: matched by tag id, so renaming a tag doesn't break them.
+  const billTagIds = new Set(bills.map((b) => b.tag_id));
   const daysInSelectedMonth = getDaysInMonth(monthDate);
   const todayStr = format(new Date(), "yyyy-MM-dd");
   const currentMonthStr = todayStr.slice(0, 7);
@@ -183,7 +185,7 @@ export default function DashboardPage() {
     monthTransactions,
     selectedMonth,
     todayStr,
-    new Set(bills.map((b) => b.tag_id)),
+    billTagIds,
     billRows.filter((r) => r.status !== "logged" && r.amount !== null).reduce((sum, r) => sum + (r.amount as number), 0)
   );
 
@@ -317,6 +319,10 @@ export default function DashboardPage() {
           loggableBills={loggableBills}
           onLogMissing={handleLogMissingBills}
         />
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:gap-5 lg:grid-cols-2">
+        <SpendSplitCard split={spendSplit(monthTransactions, billTagIds)} />
       </div>
 
       {/* Recent transactions */}

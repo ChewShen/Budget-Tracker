@@ -196,3 +196,17 @@ export function monthInsights(txs: Transaction[], month: string, today: string, 
 
   return out.sort((a, b) => b.score - a.score).slice(0, limit);
 }
+
+export interface SpendSplit {
+  everyday: number; // flexible, day-to-day spending
+  bills: number; // tags that are monthly bills
+  oneOff: number; // marked one-off
+}
+
+// Bills first (a bill is fixed even if marked one-off), then one-offs, then everyday.
+export function spendSplit(monthTxs: Transaction[], billTagIds: Set<string>): SpendSplit {
+  const bills = monthTxs.filter((t) => billTagIds.has(t.tag_id));
+  const oneOff = monthTxs.filter((t) => !billTagIds.has(t.tag_id) && t.is_one_off);
+  const everyday = monthTxs.filter((t) => !billTagIds.has(t.tag_id) && !t.is_one_off);
+  return { everyday: sumAmounts(everyday), bills: sumAmounts(bills), oneOff: sumAmounts(oneOff) };
+}
