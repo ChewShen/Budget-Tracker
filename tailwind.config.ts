@@ -1,4 +1,5 @@
 import type { Config } from "tailwindcss";
+import plugin from "tailwindcss/plugin";
 
 export default {
   darkMode: ["class", '[data-theme="dark"]'],
@@ -73,5 +74,8 @@ export default {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    // `pointer-fine:` = mouse/trackpad devices, where swipe-to-scroll rows are awkward.
+    plugin(({ addVariant }) => addVariant("pointer-fine", "@media (pointer: fine)")),
+  ],
 } satisfies Config;

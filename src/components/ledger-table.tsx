@@ -68,7 +68,7 @@ export function LedgerTable({
               className="field rounded-full bg-card pl-10"
             />
           </div>
-          <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 scrollbar-none sm:mx-0 sm:px-0">
+          <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 scrollbar-none sm:mx-0 sm:px-0 pointer-fine:flex-wrap pointer-fine:overflow-visible">
             {["ALL", ...categories].map((c) => (
               <button
                 key={c}
