@@ -10,9 +10,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned
-- [ ] Savings page fixes: carry balances forward, "not recorded" months, growth and untracked cash, net worth trend.
+- [ ] Flexible savings accounts (add, rename or remove accounts; per-account rate and liquid/locked type).
 - [ ] GitHub Actions check running `scripts/test_formulas.mjs` on pull requests.
 - [ ] Configure custom domain (optional).
+
+---
+
+## [0.6.0] - 2026-09-28
+
+### Added
+- **Monthly savings check**: Compares how much liquid money grew with what you saved from salary, and explains the untracked difference (unlogged spending or income). Shown only for back-to-back recorded months.
+- **Net worth over time**: Bar chart of recorded months; tapping a bar opens that month.
+- **Update balances sheet**: Pre-filled from the latest earlier month (balances and interest rates), with the earlier value shown under each field and a live net worth total.
+
+### Changed
+- Balances are labelled as month-end ("Net worth on 30 Sep 2026"), with each account's share of the total.
+- Months with no balances (including the all-zero rows from the Excel import) show "Not recorded yet" instead of RM 0.00; future months can't be recorded.
+
+### Fixed
+- Balance fields can be cleared and typed normally (no more snapping to 0 or "05"); non-numeric input is rejected.
+- Closing the balances sheet with unsaved changes asks before discarding them.
 
 ---
 
