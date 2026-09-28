@@ -210,9 +210,11 @@ export default function DashboardPage() {
     return { ...m, projectedRest, projectedTotal: m.total + projectedRest };
   });
   const completed = trend.filter((m) => m.month < currentMonthStr && m.total > 0);
-  const trendAverage = completed.length
-    ? Math.round((completed.reduce((sum, m) => sum + m.total, 0) / completed.length) * 100) / 100
-    : null;
+  // Needs a completed month other than the selected one, or it only compares the month with itself.
+  const trendAverage =
+    completed.some((m) => m.month !== selectedMonth)
+      ? Math.round((completed.reduce((sum, m) => sum + m.total, 0) / completed.length) * 100) / 100
+      : null;
 
   const handleLogMissingBills = () => {
     loggableBills.forEach((b) =>
