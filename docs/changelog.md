@@ -15,6 +15,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.7.0] - 2026-09-28
+
+### Added
+- **Categories & tags in Settings**: Add categories with an icon, add tags, rename either, and delete ones no expense uses. Items in use show how many expenses use them and can only be renamed.
+- **"+ New tag" in Add expense**: Create a tag without leaving the sheet; it is selected straight away.
+
+### Changed
+- Categories are listed alphabetically.
+
+### Database
+- New migration `scripts/migrations/2026-09-28_manage_categories_tags.sql` (run once in Supabase): adds `categories.icon` and lets the signed-in owner add, rename and delete categories and tags.
+
+---
+
 ## [0.6.1] - 2026-09-28
 
 ### Added
