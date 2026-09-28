@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [0.4.0] - 2026-09-26
+## [0.4.0] - 2026-09-28
 
 ### Added
 - **Authentication**: Email + password sign-in at `/login` (no public sign-up), middleware redirect for signed-out visitors, and a sign-out button.
@@ -25,11 +25,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Undo delete**: Deleting a transaction shows an Undo toast for 5 seconds before it reaches the database.
 - **Faster entry**: Time-of-day meal tag default, Recent shortcuts (tag + last amount), keyboard amount entry on desktop, and one-tap logging of missing monthly bills with last month's amounts.
 - **Light/dark theme toggle**, with dark as the default.
+- **Settings page** (`/settings`): choose whether Add expense starts on today's date or the last entry's date (saved per device). Sign out moved here from the top bar.
 
 ### Changed
 - **Refined dark redesign**: Neutral near-black surfaces with lime as an accent fill only, Inter font, spend hero with daily bar chart and month-over-month change, ranked category and tag lists (replacing the donut chart), transactions grouped by day, net worth hero on Savings, floating mobile nav and bottom-sheet quick add.
 - The app opens on the current month instead of a fixed month.
 - Data loads only after sign-in; the localStorage cache is used only in local-only mode (no Supabase configured).
+- On mouse/trackpad devices, chip rows (Recent, categories, filters) wrap instead of scrolling sideways; touchscreens keep swipeable rows.
 
 ### Fixed
 - Failed saves no longer fail silently: the optimistic row is rolled back and a Retry toast is shown.
