@@ -44,3 +44,54 @@ export function draftFor(savings: MonthlySavings[], month: string): MonthlySavin
 // Recorded snapshots in chronological order, for the trend chart.
 export const recordedHistory = (savings: MonthlySavings[]) =>
   savings.filter(isRecorded).sort((a, b) => a.month.localeCompare(b.month));
+
+// ---- Emergency fund ----
+
+const monthIndex = (month: string) => Number(month.slice(0, 4)) * 12 + Number(month.slice(5, 7)) - 1;
+
+// Average spending over up to `n` completed months (before the current month) with expenses,
+// up to and including `month`. A half-finished month would understate it, so it's left out.
+export function averageMonthlySpend(
+  txs: { date: string; amount: number }[],
+  month: string,
+  currentMonth: string,
+  n = 3
+): { average: number; months: string[] } {
+  const months = Array.from(new Set(txs.map((t) => t.date.slice(0, 7))))
+    .filter((m) => m <= month && m < currentMonth)
+    .sort()
+    .slice(-n);
+  const total = txs.filter((t) => months.includes(t.date.slice(0, 7))).reduce((sum, t) => sum + t.amount, 0);
+  return { average: months.length ? Math.round((total / months.length) * 100) / 100 : 0, months };
+}
+
+export interface SavingPace {
+  perMonth: number;
+  basis: "balances" | "budget"; // measured from recorded balances, or estimated from salary minus spending
+}
+
+// How fast liquid money grows: measured across recorded months when there are at least two,
+// otherwise estimated as take-home pay minus average spending.
+export function savingPace(
+  savings: MonthlySavings[],
+  month: string,
+  takeHome: number,
+  averageSpend: number
+): SavingPace {
+  const history = recordedHistory(savings).filter((s) => s.month.slice(0, 7) <= month);
+  if (history.length >= 2) {
+    const first = history[0];
+    const last = history[history.length - 1];
+    const span = monthIndex(last.month.slice(0, 7)) - monthIndex(first.month.slice(0, 7));
+    return { perMonth: Math.round(((liquidOf(last) - liquidOf(first)) / span) * 100) / 100, basis: "balances" };
+  }
+  return { perMonth: Math.round((takeHome - averageSpend) * 100) / 100, basis: "budget" };
+}
+
+// Month (YYYY-MM) when `remaining` is covered at `perMonth`, counting from `month`; null if not growing.
+export function reachMonth(month: string, remaining: number, perMonth: number): string | null {
+  if (remaining <= 0) return month;
+  if (perMonth <= 0) return null;
+  const i = monthIndex(month) + Math.ceil(remaining / perMonth);
+  return `${Math.floor(i / 12)}-${String((i % 12) + 1).padStart(2, "0")}`;
+}
