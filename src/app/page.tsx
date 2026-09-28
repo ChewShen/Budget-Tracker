@@ -10,7 +10,8 @@ import { SpendHero } from "@/components/spend-hero";
 import { SalaryEngine } from "@/components/salary-engine";
 import { RecurringSentinel, type BillStatus } from "@/components/recurring-sentinel";
 import { canAutoLog } from "@/lib/bills";
-import { baseline, monthForecast, monthProgress } from "@/lib/analytics";
+import { baseline, monthForecast, monthProgress, monthlyTotals } from "@/lib/analytics";
+import { SpendingTrend } from "@/components/spending-trend";
 import { CategoryChart } from "@/components/category-chart";
 import { TagsBarChart } from "@/components/tags-bar-chart";
 import { LedgerTable } from "@/components/ledger-table";
@@ -185,6 +186,16 @@ export default function DashboardPage() {
     billRows.filter((r) => r.status !== "logged" && r.amount !== null).reduce((sum, r) => sum + (r.amount as number), 0)
   );
 
+  // 9. Monthly trend ending at the selected month; average over completed months only.
+  const trend = monthlyTotals(transactions, selectedMonth).map((m) => {
+    const projectedRest = forecast && m.month === selectedMonth ? Math.max(0, forecast.projected - m.total) : 0;
+    return { ...m, projectedRest, projectedTotal: m.total + projectedRest };
+  });
+  const completed = trend.filter((m) => m.month < currentMonthStr && m.total > 0);
+  const trendAverage = completed.length
+    ? Math.round((completed.reduce((sum, m) => sum + m.total, 0) / completed.length) * 100) / 100
+    : null;
+
   const handleLogMissingBills = () => {
     loggableBills.forEach((b) =>
       addTransaction({
@@ -271,6 +282,13 @@ export default function DashboardPage() {
         dailyAverage={dailyAverage}
         largestExpense={largestExpense}
         savingsRate={salaryMetrics.savingsRate}
+      />
+
+      <SpendingTrend
+        data={trend}
+        average={trendAverage}
+        selectedMonth={selectedMonth}
+        onSelectMonth={setSelectedMonth}
       />
 
       <div className="grid grid-cols-1 gap-4 sm:gap-5 lg:grid-cols-2">
