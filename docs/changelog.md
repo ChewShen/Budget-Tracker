@@ -15,6 +15,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.11.0] - 2026-09-28
+
+### Added
+- **Emergency fund**: How many months of spending your liquid money covers, a goal of 3–12 months with progress, and when you'll reach it at your current pace.
+- **Since last month, by account**: Each account's balance before and after, and where the change in net worth came from.
+- **Savings rate by month**: Monthly savings rate against the 20% target (on target, below target, overspent), with the average and how many months hit the target.
+- **Roadmap**: `docs/roadmap.md` collects ideas for future versions.
+
+### Changed
+- The salary profile loads all columns and saves only salary fields, so new profile settings can't break salary edits.
+
+### Database
+- New migration `scripts/migrations/2026-09-28_emergency_goal.sql` (run once in Supabase): adds `user_profiles.emergency_months` for the emergency fund goal (default 6).
+
+---
+
 ## [0.10.0] - 2026-09-28
 
 ### Added
