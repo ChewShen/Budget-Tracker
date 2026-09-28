@@ -7,6 +7,7 @@ import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis } from "rechar
 import { useBudget } from "@/lib/budget-context";
 import { MonthSelector } from "@/components/month-selector";
 import { BalancesSheet } from "@/components/balances-sheet";
+import { EmergencyFundCard } from "@/components/emergency-fund";
 import { formatCurrency } from "@/lib/utils";
 import {
   calculateDigitalBankInterest,
@@ -15,11 +16,14 @@ import {
 } from "@/lib/formulas";
 import {
   draftFor,
+  averageMonthlySpend,
   latestBefore,
   liquidOf,
   netWorthOf,
   previousMonth,
+  reachMonth,
   recordedHistory,
+  savingPace,
   snapshotFor,
 } from "@/lib/savings";
 import { MonthlySavings } from "@/lib/types";
@@ -49,8 +53,17 @@ function TrendTooltip({
 }
 
 export default function SavingsPage() {
-  const { savings, transactions, selectedMonth, setSelectedMonth, updateSavings, profile, showToast } =
-    useBudget();
+  const {
+    savings,
+    transactions,
+    selectedMonth,
+    setSelectedMonth,
+    updateSavings,
+    profile,
+    showToast,
+    emergencyMonths,
+    setEmergencyMonths,
+  } = useBudget();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
 
   const monthDate = parse(`${selectedMonth}-01`, "yyyy-MM-dd", new Date());
@@ -67,7 +80,13 @@ export default function SavingsPage() {
   const totalSpend = transactions
     .filter((t) => t.date.startsWith(selectedMonth))
     .reduce((sum, t) => sum + t.amount, 0);
-  const { netCashSaved } = calculateSalaryMetrics(profile.default_gross_salary, totalSpend, profile);
+  const { netCashSaved, netSalary } = calculateSalaryMetrics(profile.default_gross_salary, totalSpend, profile);
+
+  // Emergency fund: liquid money vs average spending of completed months.
+  const spend = averageMonthlySpend(transactions, selectedMonth, format(new Date(), "yyyy-MM"));
+  const pace = savingPace(savings, selectedMonth, netSalary, spend.average);
+  const emergencyTarget = emergencyMonths * spend.average;
+  const reachBy = current ? reachMonth(selectedMonth, emergencyTarget - liquidOf(current), pace.perMonth) : null;
 
   const growth = current && prevAdjacent ? liquidOf(current) - liquidOf(prevAdjacent) : null;
   const untracked =
@@ -160,6 +179,18 @@ export default function SavingsPage() {
             </>
           )}
         </section>
+      )}
+
+      {current && (
+        <EmergencyFundCard
+          liquid={liquidOf(current)}
+          averageSpend={spend.average}
+          spendMonths={spend.months}
+          goalMonths={emergencyMonths}
+          onChangeGoal={setEmergencyMonths}
+          pace={pace}
+          reachBy={reachBy}
+        />
       )}
 
       {current && (

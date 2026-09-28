@@ -63,6 +63,8 @@ interface BudgetContextType {
   updateSavings: (savings: MonthlySavings) => Promise<void>;
   profile: UserSalaryProfile;
   updateProfile: (profile: UserSalaryProfile) => Promise<void>;
+  emergencyMonths: number; // emergency fund goal, in months of spending
+  setEmergencyMonths: (months: number) => Promise<void>;
   toast: Toast | null;
   showToast: (toast: Omit<Toast, "id">) => void;
   dismissToast: () => void;
@@ -91,6 +93,7 @@ const STORAGE_KEYS = {
   CATEGORIES: "budget_tracker_categories",
   TAGS: "budget_tracker_tags",
   BILLS: "budget_tracker_bills",
+  EMERGENCY_MONTHS: "budget_tracker_emergency_months",
 };
 
 // Turns a Supabase/Postgres error into a message the user can act on.
@@ -120,6 +123,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
   const [isLoaded, setIsLoaded] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [profile, setProfile] = useState<UserSalaryProfile>(DEFAULT_PROFILE);
+  const [emergencyMonths, setEmergencyMonthsState] = useState(6);
   const [bills, setBills] = useState<RecurringBill[]>(() =>
     isSupabaseConfigured
       ? []
@@ -159,6 +163,8 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
         if (savedTags) setTags(JSON.parse(savedTags));
         const savedBills = localStorage.getItem(STORAGE_KEYS.BILLS);
         if (savedBills) setBills(JSON.parse(savedBills));
+        const savedGoal = Number(localStorage.getItem(STORAGE_KEYS.EMERGENCY_MONTHS));
+        if (savedGoal >= 1 && savedGoal <= 24) setEmergencyMonthsState(savedGoal);
         const savedProfile = localStorage.getItem(STORAGE_KEYS.PROFILE);
         if (savedProfile) setProfile({ ...DEFAULT_PROFILE, ...JSON.parse(savedProfile) });
       } catch (e) {
@@ -187,7 +193,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
       supabase.from("monthly_savings").select("*").order("month", { ascending: true }),
       supabase
         .from("user_profiles")
-        .select("default_gross_salary, epf_rate, socso_rate, eis_rate")
+        .select("*")
         .maybeSingle(),
       supabase.from("recurring_sentinel").select("*"),
     ]).then(([cats, tgs, txs, svs, prof, bls]) => {
@@ -234,6 +240,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
           socso_rate: Number(prof.data.socso_rate ?? DEFAULT_PROFILE.socso_rate),
           eis_rate: Number(prof.data.eis_rate ?? DEFAULT_PROFILE.eis_rate),
         });
+        if (prof.data.emergency_months) setEmergencyMonthsState(Number(prof.data.emergency_months));
       }
       setIsSyncedWithSupabase(true);
       setIsLoaded(true);
@@ -498,7 +505,17 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
 
     const { error } = await supabase
       .from("user_profiles")
-      .upsert({ id: user.id, email: user.email, ...next }, { onConflict: "id" });
+      .upsert(
+        {
+          id: user.id,
+          email: user.email,
+          default_gross_salary: next.default_gross_salary,
+          epf_rate: next.epf_rate,
+          socso_rate: next.socso_rate,
+          eis_rate: next.eis_rate,
+        },
+        { onConflict: "id" }
+      );
     if (error) {
       console.error("Supabase profile upsert error:", error);
       setProfile(previous);
@@ -721,6 +738,37 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
     return true;
   };
 
+  // Saved on its own (not with the salary) so salary edits never depend on the goal's migration.
+  const setEmergencyMonths = async (months: number) => {
+    const previous = emergencyMonths;
+    setEmergencyMonthsState(months);
+    if (!isSupabaseConfigured) {
+      try {
+        localStorage.setItem(STORAGE_KEYS.EMERGENCY_MONTHS, String(months));
+      } catch {
+        // Storage unavailable; the goal applies for this session only.
+      }
+      return;
+    }
+    const supabase = createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
+    const { error } = await supabase.from("user_profiles").update({ emergency_months: months }).eq("id", user.id);
+    if (error) {
+      console.error("Supabase emergency goal update error:", error);
+      setEmergencyMonthsState(previous);
+      showToast({
+        tone: "error",
+        message:
+          error.code === "42703" || error.code === "PGRST204"
+            ? "Run scripts/migrations/2026-09-28_emergency_goal.sql in Supabase first."
+            : "Couldn't save the emergency fund goal",
+      });
+    }
+  };
+
   const signOut = async () => {
     if (!isSupabaseConfigured) return;
     await createClient().auth.signOut();
@@ -742,6 +790,8 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
         updateSavings,
         profile,
         updateProfile,
+        emergencyMonths,
+        setEmergencyMonths,
         toast,
         showToast,
         dismissToast,
