@@ -197,9 +197,9 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-public-key
 ```bash
 npm run dev         # Start local development server on http://localhost:3000
 npm run type-check  # Verify TypeScript compilation (tsc --noEmit)
-npm run lint        # Check code quality and ESLint rules
+npm run lint        # ESLint (flat config in eslint.config.mjs)
+npm test            # Formula parity with Excel (scripts/test_formulas.mjs)
 npm run build       # Build optimized Next.js production bundle
-node scripts/test_formulas.mjs  # Run mathematical verification against Excel
 ```
 
 ---

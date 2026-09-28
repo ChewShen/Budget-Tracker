@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { X, Delete } from "lucide-react";
+import { X, Delete, Trash2 } from "lucide-react";
 import { categoryIcon, categoryLabel } from "@/lib/categories";
 import { format, subDays } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
 import { Transaction } from "@/lib/types";
+import type { NewTransaction } from "@/lib/budget-context";
 import { getDefaultDateMode, getLastEntryDate, setLastEntryDate } from "@/lib/preferences";
 
 // Food tag most likely for the current time of day (used as the default when the sheet opens).
@@ -26,14 +27,11 @@ interface QuickAddModalProps {
   categories: { id: string; name: string }[];
   tags: { id: string; category_id: string; name: string }[];
   transactions: Transaction[];
-  onSave: (transaction: {
-    amount: number;
-    date: string;
-    category_id: string;
-    tag_id: string;
-    description?: string;
-    is_one_off: boolean;
-  }) => Promise<void>;
+  // When set, the sheet edits this entry instead of adding a new one.
+  editing: Transaction | null;
+  onSave: (transaction: NewTransaction) => Promise<void>;
+  onUpdate: (id: string, transaction: NewTransaction) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
 }
 
 function appendDigit(current: string, digit: string): string {
@@ -49,7 +47,10 @@ export function QuickAddModal({
   categories,
   tags,
   transactions,
+  editing,
   onSave,
+  onUpdate,
+  onDelete,
 }: QuickAddModalProps) {
   const [amountStr, setAmountStr] = useState("");
   const [selectedDate, setSelectedDate] = useState(format(new Date(), "yyyy-MM-dd"));
@@ -77,11 +78,25 @@ export function QuickAddModal({
       .map(({ tx }) => tx);
   }, [transactions]);
 
-  // Fresh defaults every time the sheet opens: today's date (or the last entry's date, per Settings),
-  // and the meal for the current time
+  // Every time the sheet opens: pre-fill from the entry being edited, or start fresh with
+  // today's date (or the last entry's date, per Settings) and the meal for the current time
   // (falling back to the last-used tag, then the first category).
   useEffect(() => {
     if (!isOpen || categories.length === 0) return;
+
+    if (editing) {
+      setAmountStr(Number.isInteger(editing.amount) ? String(editing.amount) : editing.amount.toFixed(2));
+      setSelectedDate(editing.date);
+      setSelectedCategoryId(editing.category_id);
+      setSelectedTagId(editing.tag_id);
+      setDescription(editing.description || "");
+      setIsOneOff(editing.is_one_off);
+      return;
+    }
+
+    setAmountStr("");
+    setDescription("");
+    setIsOneOff(false);
     const today = format(new Date(), "yyyy-MM-dd");
     setSelectedDate(getDefaultDateMode() === "last" ? getLastEntryDate() || today : today);
 
@@ -100,7 +115,7 @@ export function QuickAddModal({
     }
     // Only when the sheet opens; not when data changes while it is open.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen]);
+  }, [isOpen, editing]);
 
   const applyRecent = (tx: Transaction) => {
     setSelectedCategoryId(tx.category_id);
@@ -152,17 +167,23 @@ export function QuickAddModal({
     if (!amount || isNaN(amount) || amount <= 0) return;
     if (!selectedCategoryId || !selectedTagId) return;
 
-    // The row appears instantly; a failed save shows a Retry toast, so there's no need to wait here.
-    setIsSubmitting(true);
-    setLastEntryDate(selectedDate);
-    onSave({
+    const payload: NewTransaction = {
       amount,
       date: selectedDate,
       category_id: selectedCategoryId,
       tag_id: selectedTagId,
       description: description.trim() || undefined,
       is_one_off: isOneOff,
-    }).catch((err) => console.error(err));
+    };
+
+    // The change shows instantly; a failed save shows a Retry toast, so there's no need to wait here.
+    setIsSubmitting(true);
+    if (editing) {
+      onUpdate(editing.id, payload).catch((err) => console.error(err));
+    } else {
+      setLastEntryDate(selectedDate);
+      onSave(payload).catch((err) => console.error(err));
+    }
     setAmountStr("");
     setDescription("");
     setIsOneOff(false);
@@ -170,7 +191,14 @@ export function QuickAddModal({
     onClose();
   };
 
+  const handleDelete = () => {
+    if (!editing) return;
+    onDelete(editing.id).catch((err) => console.error(err));
+    onClose();
+  };
+
   const amountDisplay = amountStr || "0";
+  const title = editing ? "Edit expense" : "Add expense";
 
   return (
     <div
@@ -180,7 +208,7 @@ export function QuickAddModal({
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Add expense"
+        aria-label={title}
         onClick={(e) => e.stopPropagation()}
         className="max-h-[92dvh] w-full max-w-md animate-sheet-up sm:max-w-lg overflow-y-auto rounded-t-3xl border bg-card px-5 pb-safe pt-3 shadow-2xl sm:rounded-3xl sm:pb-5"
       >
@@ -188,7 +216,7 @@ export function QuickAddModal({
         <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-border sm:hidden" />
 
         <div className="flex items-center justify-between">
-          <h2 className="text-[15px] font-semibold">Add expense</h2>
+          <h2 className="text-[15px] font-semibold">{title}</h2>
           <button
             onClick={onClose}
             className="-mr-1.5 rounded-full p-2 text-muted-foreground transition hover:bg-secondary hover:text-foreground"
@@ -215,7 +243,7 @@ export function QuickAddModal({
           </div>
 
           {/* Recent shortcuts: fill tag + amount in one tap */}
-          {recents.length > 0 && (
+          {!editing && recents.length > 0 && (
             <div>
               <div className="mb-1.5 text-xs font-medium text-muted-foreground">Recent</div>
               <div className="-mx-5 flex gap-1.5 overflow-x-auto px-5 scrollbar-none pointer-fine:mx-0 pointer-fine:flex-wrap pointer-fine:overflow-visible pointer-fine:px-0">
@@ -331,13 +359,25 @@ export function QuickAddModal({
             ))}
           </div>
 
-          <button
-            type="submit"
-            disabled={!parseFloat(amountStr) || isSubmitting}
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-primary text-sm font-semibold text-primary-foreground transition hover:brightness-95 active:scale-[0.98] disabled:opacity-40"
-          >
-            {isSubmitting ? "Saving…" : "Save expense"}
-          </button>
+          <div className="flex gap-2">
+            {editing && (
+              <button
+                type="button"
+                onClick={handleDelete}
+                className="flex h-12 shrink-0 items-center justify-center gap-1.5 rounded-full border px-5 text-sm font-medium text-danger transition hover:bg-danger/10"
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete
+              </button>
+            )}
+            <button
+              type="submit"
+              disabled={!parseFloat(amountStr) || isSubmitting}
+              className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-primary text-sm font-semibold text-primary-foreground transition hover:brightness-95 active:scale-[0.98] disabled:opacity-40"
+            >
+              {isSubmitting ? "Saving…" : editing ? "Save changes" : "Save expense"}
+            </button>
+          </div>
         </form>
       </div>
     </div>

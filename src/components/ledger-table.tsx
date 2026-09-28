@@ -5,6 +5,7 @@ import { Search, Trash2 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { CategoryIcon, categoryLabel } from "@/lib/categories";
 import { Transaction } from "@/lib/types";
+import { useQuickAdd } from "@/components/app-shell";
 import { cn } from "@/lib/utils";
 
 interface LedgerTableProps {
@@ -27,6 +28,7 @@ export function LedgerTable({
   onDeleteTransaction,
   showFilters = true,
 }: LedgerTableProps) {
+  const { openEdit } = useQuickAdd();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("ALL");
 
@@ -105,25 +107,32 @@ export function LedgerTable({
                   {txs.map((tx) => (
                     <li
                       key={tx.id}
-                      className="group flex items-center gap-3 px-4 py-3 transition hover:bg-secondary/30 sm:px-5"
+                      className="group flex cursor-pointer items-center gap-3 px-4 py-3 transition hover:bg-secondary/30 sm:px-5"
                     >
-                      <CategoryIcon name={tx.category_name} />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="truncate text-sm font-medium">{tx.tag_name}</span>
-                          {tx.is_one_off && (
-                            <span className="shrink-0 rounded-full border px-1.5 py-px text-[10px] font-medium text-muted-foreground">
-                              One-off
-                            </span>
-                          )}
+                      <button
+                        type="button"
+                        onClick={() => openEdit(tx)}
+                        className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                        aria-label={`Edit ${tx.tag_name} ${formatCurrency(tx.amount)}`}
+                      >
+                        <CategoryIcon name={tx.category_name} />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="truncate text-sm font-medium">{tx.tag_name}</span>
+                            {tx.is_one_off && (
+                              <span className="shrink-0 rounded-full border px-1.5 py-px text-[10px] font-medium text-muted-foreground">
+                                One-off
+                              </span>
+                            )}
+                          </div>
+                          <div className="truncate text-xs text-muted-foreground">
+                            {tx.description || categoryLabel(tx.category_name)}
+                          </div>
                         </div>
-                        <div className="truncate text-xs text-muted-foreground">
-                          {tx.description || categoryLabel(tx.category_name)}
-                        </div>
-                      </div>
-                      <span className="shrink-0 text-sm font-semibold tabular-nums">
-                        −{formatCurrency(tx.amount)}
-                      </span>
+                        <span className="shrink-0 text-sm font-semibold tabular-nums">
+                          −{formatCurrency(tx.amount)}
+                        </span>
+                      </button>
                       {onDeleteTransaction && (
                         <button
                           onClick={() => onDeleteTransaction(tx.id)}

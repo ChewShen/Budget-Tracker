@@ -58,45 +58,48 @@ git status
 # Must be clean and on the 'main' or release branch
 ```
 
-### Step 2: Run Tests & Build Check
+### Step 2: Run the Checks
 ```bash
+npm run type-check
 npm run lint
-npm run test
+npm test
 npm run build
 ```
 
-### Step 3: Bump the Version
-Use `npm version` which automatically updates `package.json`, `package-lock.json`, and generates a Git tag:
+### Step 3: Bump the Version (no tag yet)
+Bump on the working branch (e.g. `chewshen`). `--no-git-tag-version` updates `package.json` and `package-lock.json` only; tagging happens in Step 6.
 
 ```bash
-# For a bug fix (e.g. v0.1.0 -> v0.1.1)
-npm version patch -m "chore(release): bump version to %s"
-
-# For a new feature (e.g. v0.1.0 -> v0.2.0)
-npm version minor -m "chore(release): bump version to %s"
-
-# For breaking changes (e.g. v0.1.0 -> v1.0.0)
-npm version major -m "chore(release): bump version to %s"
+npm version patch --no-git-tag-version   # bug fix        (0.6.0 -> 0.6.1)
+npm version minor --no-git-tag-version   # new feature    (0.6.0 -> 0.7.0)
+npm version major --no-git-tag-version   # breaking change (0.6.0 -> 1.0.0)
 ```
 
 ### Step 4: Update `docs/changelog.md`
-1. Change the `## [Unreleased]` section header to the newly bumped version and today's date:
-   ```markdown
-   ## [0.2.0] - 2026-10-01
-   ```
-2. Create a fresh, empty `## [Unreleased]` block at the top.
+1. Add a `## [X.Y.Z] - YYYY-MM-DD` section below `## [Unreleased]`, grouped as Added / Changed / Fixed / Security.
+2. Move anything shipped out of the Unreleased "Planned" list.
 
-### Step 5: Amend Commit and Re-tag
+### Step 5: Commit and Push
 ```bash
-git add docs/changelog.md
-git commit --amend --no-edit
-git tag -f $(node -p "require('./package.json').version")
+git add package.json package-lock.json docs/changelog.md
+git commit -m "chore(release): bump version to vX.Y.Z"
+git push
 ```
 
-### Step 6: Push to Remote
-```bash
-git push origin main --follow-tags
-```
+### Step 6: Tag the Release
+Tags are annotated and point at the released code. Pick one:
+
+* **Normal release** (after the PR is merged through `dev` into `main`): tag the merge commit on `main`.
+  ```bash
+  git checkout main && git pull
+  git tag -a vX.Y.Z -m "vX.Y.Z: <summary>"
+  git push origin vX.Y.Z
+  ```
+* **Folded release** (several versions go out in one PR later): tag the `chore(release)` commit on the working branch now. It becomes part of `main` when the PR is merged.
+  ```bash
+  git tag -a vX.Y.Z <release-commit-sha> -m "vX.Y.Z: <summary>"
+  git push origin vX.Y.Z
+  ```
 
 ---
 
