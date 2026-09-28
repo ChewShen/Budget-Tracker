@@ -15,6 +15,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.8.0] - 2026-09-28
+
+### Added
+- **Editable monthly bills** (Settings → Monthly bills): choose which tags are monthly bills, with an optional expected amount and due day.
+- **Bill due status** on Overview: Overdue, Due in N days, Due on a date, Missing or Logged, with an overdue count.
+
+### Changed
+- Bills are linked to the tag rather than its name, so renaming a tag keeps its bill.
+- "Log unpaid bills" uses the expected amount on the due day when set, otherwise last month's payment.
+
+### Fixed
+- Renaming an imported category no longer resets its icon.
+- Dates always use the same month format ("Sep", not sometimes "Sept").
+
+### Database
+- New migration `scripts/migrations/2026-09-28_monthly_bills.sql` (run once in Supabase): adds expected amount and due day to `recurring_sentinel`, one row per bill, and carries over the 8 existing bills.
+
+---
+
 ## [0.7.0] - 2026-09-28
 
 ### Added
