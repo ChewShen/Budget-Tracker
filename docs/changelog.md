@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned
-- [ ] Flexible savings accounts (add, rename or remove accounts; per-account rate and liquid/locked type).
+- See [`docs/roadmap.md`](roadmap.md) for the idea backlog.
 - [ ] Configure custom domain (optional).
 
 ---
