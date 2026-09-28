@@ -1,0 +1,302 @@
+"use client";
+
+import { useState } from "react";
+import { Check, Plus, Trash2 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useBudget } from "@/lib/budget-context";
+import { CATEGORY_ICON_OPTIONS, categoryIcon, categoryLabel } from "@/lib/categories";
+import { Category } from "@/lib/types";
+
+// Which inline editor is open (only one at a time).
+type Editor =
+  | { kind: "none" }
+  | { kind: "new-category" }
+  | { kind: "category"; id: string }
+  | { kind: "new-tag"; categoryId: string }
+  | { kind: "tag"; id: string };
+
+function IconPicker({ value, onChange }: { value: string; onChange: (key: string) => void }) {
+  return (
+    <div role="radiogroup" aria-label="Icon" className="grid grid-cols-8 gap-1.5 sm:grid-cols-11">
+      {Object.entries(CATEGORY_ICON_OPTIONS).map(([key, Icon]) => (
+        <button
+          key={key}
+          type="button"
+          role="radio"
+          aria-checked={value === key}
+          aria-label={key.replace(/-/g, " ")}
+          onClick={() => onChange(key)}
+          className={cn(
+            "flex aspect-square items-center justify-center rounded-lg border transition",
+            value === key
+              ? "border-transparent bg-primary text-primary-foreground"
+              : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+          )}
+        >
+          <Icon className="h-4 w-4" />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function CategoryForm({
+  initial,
+  usedBy,
+  onSave,
+  onDelete,
+  onCancel,
+}: {
+  initial?: Category;
+  usedBy?: number;
+  onSave: (name: string, icon: string) => Promise<boolean>;
+  onDelete?: () => void;
+  onCancel: () => void;
+}) {
+  const [name, setName] = useState(initial?.name ?? "");
+  const [icon, setIcon] = useState(initial?.icon || "circle-dashed");
+  const [isBusy, setIsBusy] = useState(false);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsBusy(true);
+    const ok = await onSave(name, icon);
+    setIsBusy(false);
+    if (ok) onCancel();
+  };
+
+  return (
+    <form onSubmit={submit} className="space-y-3 rounded-xl border bg-background/40 p-4">
+      <input
+        autoFocus
+        required
+        maxLength={40}
+        placeholder="Category name"
+        aria-label="Category name"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        className="field"
+      />
+      <IconPicker value={icon} onChange={setIcon} />
+      {usedBy !== undefined && (
+        <p className="text-xs text-muted-foreground">
+          Used by {usedBy} expense{usedBy === 1 ? "" : "s"}
+          {usedBy > 0 ? ", so it can be renamed but not deleted." : "."}
+        </p>
+      )}
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        {onDelete && (
+          <button
+            type="button"
+            onClick={onDelete}
+            disabled={Boolean(usedBy)}
+            className="mr-auto flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium text-danger transition hover:bg-danger/10 disabled:opacity-40 disabled:hover:bg-transparent"
+          >
+            <Trash2 className="h-4 w-4" /> Delete
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={onCancel}
+          className="rounded-full px-4 py-2 text-sm font-medium text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          disabled={isBusy || !name.trim()}
+          className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:brightness-95 disabled:opacity-40"
+        >
+          {initial ? "Save" : "Add category"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function TagInput({
+  initial = "",
+  usedBy,
+  onSave,
+  onDelete,
+  onCancel,
+}: {
+  initial?: string;
+  usedBy?: number;
+  onSave: (name: string) => Promise<boolean>;
+  onDelete?: () => void;
+  onCancel: () => void;
+}) {
+  const [name, setName] = useState(initial);
+  const [isBusy, setIsBusy] = useState(false);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsBusy(true);
+    const ok = await onSave(name);
+    setIsBusy(false);
+    if (ok) onCancel();
+  };
+
+  return (
+    <form onSubmit={submit} className="flex w-full flex-wrap items-center gap-2 rounded-xl border bg-background/40 p-2">
+      <input
+        autoFocus
+        required
+        maxLength={40}
+        placeholder="Tag name"
+        aria-label="Tag name"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        onKeyDown={(e) => e.key === "Escape" && onCancel()}
+        className="min-w-0 flex-1 bg-transparent px-2 py-1 text-sm outline-none"
+      />
+      {usedBy !== undefined && (
+        <span className="text-xs text-muted-foreground">
+          {usedBy} expense{usedBy === 1 ? "" : "s"}
+        </span>
+      )}
+      {onDelete && (
+        <button
+          type="button"
+          onClick={onDelete}
+          disabled={Boolean(usedBy)}
+          className="rounded-full p-2 text-danger transition hover:bg-danger/10 disabled:opacity-40 disabled:hover:bg-transparent"
+          aria-label="Delete tag"
+          title={usedBy ? "Used by expenses, rename it instead" : "Delete tag"}
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={onCancel}
+        className="rounded-full px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+      >
+        Cancel
+      </button>
+      <button
+        type="submit"
+        disabled={isBusy || !name.trim()}
+        className="flex items-center gap-1 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition hover:brightness-95 disabled:opacity-40"
+      >
+        <Check className="h-3.5 w-3.5" strokeWidth={3} /> {initial ? "Save" : "Add"}
+      </button>
+    </form>
+  );
+}
+
+export function CategoryManager() {
+  const { categories, tags, transactions, addCategory, renameCategory, deleteCategory, addTag, renameTag, deleteTag } =
+    useBudget();
+  const [editor, setEditor] = useState<Editor>({ kind: "none" });
+  const close = () => setEditor({ kind: "none" });
+
+  const usage = (key: "category_id" | "tag_id", id: string) => transactions.filter((t) => t[key] === id).length;
+
+  return (
+    <section className="card p-5 sm:p-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="text-[15px] font-semibold">Categories & tags</h3>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Tap a category or tag to rename it. Anything in use by expenses can&apos;t be deleted.
+          </p>
+        </div>
+        {editor.kind !== "new-category" && (
+          <button
+            onClick={() => setEditor({ kind: "new-category" })}
+            className="flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-medium transition hover:bg-secondary"
+          >
+            <Plus className="h-4 w-4" /> New category
+          </button>
+        )}
+      </div>
+
+      {editor.kind === "new-category" && (
+        <div className="mt-4">
+          <CategoryForm
+            onCancel={close}
+            onSave={async (name, icon) => Boolean(await addCategory(name, icon))}
+          />
+        </div>
+      )}
+
+      <ul className="mt-4 divide-y divide-border/70">
+        {categories.map((cat) => {
+          const Icon = categoryIcon(cat.name, cat.icon);
+          const catTags = tags.filter((t) => t.category_id === cat.id);
+          const isEditingCat = editor.kind === "category" && editor.id === cat.id;
+          return (
+            <li key={cat.id} className="py-4 first:pt-0 last:pb-0">
+              {isEditingCat ? (
+                <CategoryForm
+                  initial={cat}
+                  usedBy={usage("category_id", cat.id)}
+                  onCancel={close}
+                  onSave={(name, icon) => renameCategory(cat.id, name, icon)}
+                  onDelete={async () => {
+                    if (window.confirm(`Delete ${categoryLabel(cat.name)} and its ${catTags.length} tags?`)) {
+                      if (await deleteCategory(cat.id)) close();
+                    }
+                  }}
+                />
+              ) : (
+                <button
+                  onClick={() => setEditor({ kind: "category", id: cat.id })}
+                  className="-mx-2 flex w-[calc(100%+1rem)] items-center gap-3 rounded-xl px-2 py-1.5 text-left transition hover:bg-secondary/40"
+                  aria-label={`Edit category ${categoryLabel(cat.name)}`}
+                >
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-secondary">
+                    <Icon className="h-4 w-4" />
+                  </span>
+                  <span className="flex-1 text-sm font-medium">{categoryLabel(cat.name)}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {catTags.length} tag{catTags.length === 1 ? "" : "s"}
+                  </span>
+                </button>
+              )}
+
+              <div className="mt-2.5 flex flex-wrap gap-1.5 pl-11">
+                {catTags.map((tag) =>
+                  editor.kind === "tag" && editor.id === tag.id ? (
+                    <TagInput
+                      key={tag.id}
+                      initial={tag.name}
+                      usedBy={usage("tag_id", tag.id)}
+                      onCancel={close}
+                      onSave={(name) => renameTag(tag.id, name)}
+                      onDelete={async () => {
+                        if (await deleteTag(tag.id)) close();
+                      }}
+                    />
+                  ) : (
+                    <button
+                      key={tag.id}
+                      onClick={() => setEditor({ kind: "tag", id: tag.id })}
+                      className="rounded-lg border px-2.5 py-1 text-xs text-muted-foreground transition hover:border-foreground/40 hover:text-foreground"
+                      aria-label={`Edit tag ${tag.name}`}
+                    >
+                      {tag.name}
+                    </button>
+                  )
+                )}
+                {editor.kind === "new-tag" && editor.categoryId === cat.id ? (
+                  <TagInput onCancel={close} onSave={async (name) => Boolean(await addTag(cat.id, name))} />
+                ) : (
+                  <button
+                    onClick={() => setEditor({ kind: "new-tag", categoryId: cat.id })}
+                    className="flex items-center gap-1 rounded-lg border border-dashed px-2.5 py-1 text-xs text-muted-foreground transition hover:border-foreground/40 hover:text-foreground"
+                    aria-label={`Add tag to ${categoryLabel(cat.name)}`}
+                  >
+                    <Plus className="h-3 w-3" /> Tag
+                  </button>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}

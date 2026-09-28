@@ -77,6 +77,15 @@ CREATE POLICY "Signed-in users read categories" ON public.categories
 CREATE POLICY "Signed-in users read tags" ON public.tags
   FOR SELECT TO authenticated USING (true);
 
+-- Owner can add/rename/delete categories and tags (see scripts/migrations/2026-09-28_manage_categories_tags.sql).
+ALTER TABLE public.categories ADD COLUMN IF NOT EXISTS icon text;
+
+CREATE POLICY "Signed-in users manage categories" ON public.categories
+  FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+CREATE POLICY "Signed-in users manage tags" ON public.tags
+  FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
 CREATE POLICY "Owner manages transactions" ON public.transactions
   FOR ALL TO authenticated
   USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());

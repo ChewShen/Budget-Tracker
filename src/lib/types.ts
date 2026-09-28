@@ -2,6 +2,7 @@ export interface Category {
   id: string;
   name: string;
   color?: string;
+  icon?: string | null; // key into CATEGORY_ICON_OPTIONS; null = pick by name
 }
 
 export interface Tag {

@@ -7,6 +7,7 @@ import { useBudget } from "@/lib/budget-context";
 import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { DefaultDateMode, getDefaultDateMode, setDefaultDateMode } from "@/lib/preferences";
+import { CategoryManager } from "@/components/category-manager";
 
 const DATE_OPTIONS: { value: DefaultDateMode; label: string; description: string }[] = [
   {
@@ -44,12 +45,14 @@ export default function SettingsPage() {
     <div className="mx-auto max-w-2xl space-y-4 sm:space-y-5">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Saved on this device</p>
+        <p className="mt-1 text-sm text-muted-foreground">Preferences, categories and account</p>
       </div>
 
       <section className="card p-5 sm:p-6">
         <h3 className="text-[15px] font-semibold">Adding expenses</h3>
-        <p className="mt-0.5 text-xs text-muted-foreground">Default date when you open Add expense</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          Default date when you open Add expense · saved on this device
+        </p>
 
         <div role="radiogroup" aria-label="Default date" className="mt-4 space-y-2">
           {DATE_OPTIONS.map((opt) => {
@@ -82,6 +85,8 @@ export default function SettingsPage() {
           })}
         </div>
       </section>
+
+      <CategoryManager />
 
       {isSupabaseConfigured && (
         <section className="card flex flex-wrap items-center justify-between gap-3 p-5 sm:p-6">

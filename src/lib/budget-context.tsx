@@ -51,6 +51,12 @@ interface BudgetContextType {
   toast: Toast | null;
   showToast: (toast: Omit<Toast, "id">) => void;
   dismissToast: () => void;
+  addCategory: (name: string, icon: string) => Promise<Category | null>;
+  renameCategory: (id: string, name: string, icon?: string) => Promise<boolean>;
+  deleteCategory: (id: string) => Promise<boolean>;
+  addTag: (categoryId: string, name: string) => Promise<Tag | null>;
+  renameTag: (id: string, name: string) => Promise<boolean>;
+  deleteTag: (id: string) => Promise<boolean>;
   signOut: () => Promise<void>;
   isSyncedWithSupabase: boolean;
   isLoaded: boolean;
@@ -63,7 +69,18 @@ const STORAGE_KEYS = {
   TRANSACTIONS: "budget_tracker_transactions",
   SAVINGS: "budget_tracker_savings",
   PROFILE: "budget_tracker_profile",
+  CATEGORIES: "budget_tracker_categories",
+  TAGS: "budget_tracker_tags",
 };
+
+// Turns a Supabase/Postgres error into a message the user can act on.
+function describeDbError(error: { code?: string; message?: string }, what: string): string {
+  if (error.code === "23505") return `${what} already exists.`;
+  if (error.code === "23503") return `${what} is still used by expenses.`;
+  if (error.code === "42501")
+    return "Not allowed yet: run scripts/migrations/2026-09-28_manage_categories_tags.sql in Supabase.";
+  return `Couldn't save ${what.toLowerCase()}.`;
+}
 
 const UNDO_MS = 5000;
 
@@ -107,6 +124,10 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
         if (savedTx) setTransactions(JSON.parse(savedTx));
         const savedSv = localStorage.getItem(STORAGE_KEYS.SAVINGS);
         if (savedSv) setSavings(JSON.parse(savedSv));
+        const savedCats = localStorage.getItem(STORAGE_KEYS.CATEGORIES);
+        if (savedCats) setCategories(JSON.parse(savedCats));
+        const savedTags = localStorage.getItem(STORAGE_KEYS.TAGS);
+        if (savedTags) setTags(JSON.parse(savedTags));
         const savedProfile = localStorage.getItem(STORAGE_KEYS.PROFILE);
         if (savedProfile) setProfile({ ...DEFAULT_PROFILE, ...JSON.parse(savedProfile) });
       } catch (e) {
@@ -182,10 +203,12 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(transactions));
       localStorage.setItem(STORAGE_KEYS.SAVINGS, JSON.stringify(savings));
       localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(profile));
+      localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(categories));
+      localStorage.setItem(STORAGE_KEYS.TAGS, JSON.stringify(tags));
     } catch (e) {
       console.error("Failed to save to localStorage", e);
     }
-  }, [transactions, savings, profile, isLoaded]);
+  }, [transactions, savings, profile, categories, tags, isLoaded]);
 
   const addTransaction = async (txInput: NewTransaction) => {
     const cat = categories.find((c) => c.id === txInput.category_id);
@@ -418,6 +441,149 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // ---- Categories & tags ----
+  // Creation waits for the database (the new id is needed right away); edits are applied after success.
+  const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name);
+
+  const addCategory = async (rawName: string, icon: string) => {
+    const name = rawName.trim();
+    if (!name) return null;
+    if (categories.some((c) => c.name.toLowerCase() === name.toLowerCase())) {
+      showToast({ tone: "error", message: `Category "${name}" already exists.` });
+      return null;
+    }
+    let created: Category = { id: `cat-${Date.now()}`, name, icon };
+    if (isSupabaseConfigured) {
+      const { data, error } = await createClient().from("categories").insert({ name, icon }).select().single();
+      if (error || !data) {
+        console.error("Supabase category insert error:", error);
+        showToast({ tone: "error", message: describeDbError(error || {}, `Category "${name}"`) });
+        return null;
+      }
+      created = data;
+    }
+    setCategories((prev) => [...prev, created].sort(byName));
+    return created;
+  };
+
+  const renameCategory = async (id: string, rawName: string, icon?: string) => {
+    const name = rawName.trim();
+    const current = categories.find((c) => c.id === id);
+    if (!name || !current) return false;
+    if (categories.some((c) => c.id !== id && c.name.toLowerCase() === name.toLowerCase())) {
+      showToast({ tone: "error", message: `Category "${name}" already exists.` });
+      return false;
+    }
+    const changes = { name, icon: icon ?? current.icon ?? null };
+    if (isSupabaseConfigured) {
+      const { error } = await createClient().from("categories").update(changes).eq("id", id);
+      if (error) {
+        console.error("Supabase category update error:", error);
+        showToast({ tone: "error", message: describeDbError(error, `Category "${name}"`) });
+        return false;
+      }
+    }
+    setCategories((prev) => prev.map((c) => (c.id === id ? { ...c, ...changes } : c)).sort(byName));
+    setTransactions((prev) => prev.map((t) => (t.category_id === id ? { ...t, category_name: name } : t)));
+    return true;
+  };
+
+  const deleteCategory = async (id: string) => {
+    const current = categories.find((c) => c.id === id);
+    if (!current) return false;
+    const used = transactions.filter((t) => t.category_id === id).length;
+    if (used > 0) {
+      showToast({
+        tone: "error",
+        message: `${current.name} is used by ${used} expense${used === 1 ? "" : "s"}. Rename it instead.`,
+      });
+      return false;
+    }
+    if (isSupabaseConfigured) {
+      // Tags cascade with the category.
+      const { error } = await createClient().from("categories").delete().eq("id", id);
+      if (error) {
+        console.error("Supabase category delete error:", error);
+        showToast({ tone: "error", message: describeDbError(error, current.name) });
+        return false;
+      }
+    }
+    setCategories((prev) => prev.filter((c) => c.id !== id));
+    setTags((prev) => prev.filter((t) => t.category_id !== id));
+    showToast({ tone: "default", message: `Deleted category ${current.name}` });
+    return true;
+  };
+
+  const addTag = async (categoryId: string, rawName: string) => {
+    const name = rawName.trim();
+    if (!name || !categoryId) return null;
+    if (tags.some((t) => t.category_id === categoryId && t.name.toLowerCase() === name.toLowerCase())) {
+      showToast({ tone: "error", message: `Tag "${name}" already exists in this category.` });
+      return null;
+    }
+    let created: Tag = { id: `tag-${Date.now()}`, category_id: categoryId, name };
+    if (isSupabaseConfigured) {
+      const { data, error } = await createClient()
+        .from("tags")
+        .insert({ category_id: categoryId, name })
+        .select()
+        .single();
+      if (error || !data) {
+        console.error("Supabase tag insert error:", error);
+        showToast({ tone: "error", message: describeDbError(error || {}, `Tag "${name}"`) });
+        return null;
+      }
+      created = data;
+    }
+    setTags((prev) => [...prev, created].sort(byName));
+    return created;
+  };
+
+  const renameTag = async (id: string, rawName: string) => {
+    const name = rawName.trim();
+    const current = tags.find((t) => t.id === id);
+    if (!name || !current) return false;
+    if (tags.some((t) => t.id !== id && t.category_id === current.category_id && t.name.toLowerCase() === name.toLowerCase())) {
+      showToast({ tone: "error", message: `Tag "${name}" already exists in this category.` });
+      return false;
+    }
+    if (isSupabaseConfigured) {
+      const { error } = await createClient().from("tags").update({ name }).eq("id", id);
+      if (error) {
+        console.error("Supabase tag update error:", error);
+        showToast({ tone: "error", message: describeDbError(error, `Tag "${name}"`) });
+        return false;
+      }
+    }
+    setTags((prev) => prev.map((t) => (t.id === id ? { ...t, name } : t)).sort(byName));
+    setTransactions((prev) => prev.map((t) => (t.tag_id === id ? { ...t, tag_name: name } : t)));
+    return true;
+  };
+
+  const deleteTag = async (id: string) => {
+    const current = tags.find((t) => t.id === id);
+    if (!current) return false;
+    const used = transactions.filter((t) => t.tag_id === id).length;
+    if (used > 0) {
+      showToast({
+        tone: "error",
+        message: `${current.name} is used by ${used} expense${used === 1 ? "" : "s"}. Rename it instead.`,
+      });
+      return false;
+    }
+    if (isSupabaseConfigured) {
+      const { error } = await createClient().from("tags").delete().eq("id", id);
+      if (error) {
+        console.error("Supabase tag delete error:", error);
+        showToast({ tone: "error", message: describeDbError(error, current.name) });
+        return false;
+      }
+    }
+    setTags((prev) => prev.filter((t) => t.id !== id));
+    showToast({ tone: "default", message: `Deleted tag ${current.name}` });
+    return true;
+  };
+
   const signOut = async () => {
     if (!isSupabaseConfigured) return;
     await createClient().auth.signOut();
@@ -442,6 +608,12 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
         toast,
         showToast,
         dismissToast,
+        addCategory,
+        renameCategory,
+        deleteCategory,
+        addTag,
+        renameTag,
+        deleteTag,
         signOut,
         isSyncedWithSupabase,
         isLoaded,
