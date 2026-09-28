@@ -11,7 +11,7 @@
 ## 🧪 Verification & Testing Results
 - [ ] `npm run type-check` passed
 - [ ] `npm run lint` passed
-- [ ] `node scripts/test_formulas.mjs` passed
+- [ ] `npm test` (formula parity) passed
 - [ ] `npm run build` completed successfully
 
 ---

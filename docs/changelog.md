@@ -10,9 +10,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned
-- [ ] Trigger Vercel deployment of v0.4.0.
-- [ ] Add PWA icons (`public/icon-192.png`, `public/icon-512.png`) referenced by the manifest.
-- [ ] Configure custom domain (optional) and install PWA on mobile device.
+- [ ] Flexible savings accounts (add, rename or remove accounts; per-account rate and liquid/locked type).
+- [ ] Configure custom domain (optional).
+
+---
+
+## [0.6.1] - 2026-09-28
+
+### Added
+- **CI**: GitHub Actions workflow runs type-check, lint and the Excel formula parity test (`npm test`) on pull requests to `dev` and `main`.
+
+### Changed
+- Linting uses the ESLint CLI with a flat config (`eslint.config.mjs`), replacing the deprecated `next lint`.
+- Release docs now match the real CI, tagging (normal vs folded releases) and backup options.
+
+### Security
+- Updated Next.js to 15.5.26 and forced its bundled PostCSS to 8.5.x, resolving the high-severity PostCSS advisories (`npm audit`: 0 vulnerabilities).
+
+---
+
+## [0.6.0] - 2026-09-28
+
+### Added
+- **Monthly savings check**: Compares how much liquid money grew with what you saved from salary, and explains the untracked difference (unlogged spending or income). Shown only for back-to-back recorded months.
+- **Net worth over time**: Bar chart of recorded months; tapping a bar opens that month.
+- **Update balances sheet**: Pre-filled from the latest earlier month (balances and interest rates), with the earlier value shown under each field and a live net worth total.
+
+### Changed
+- Balances are labelled as month-end ("Net worth on 30 Sep 2026"), with each account's share of the total.
+- Months with no balances (including the all-zero rows from the Excel import) show "Not recorded yet" instead of RM 0.00; future months can't be recorded.
+
+### Fixed
+- Balance fields can be cleared and typed normally (no more snapping to 0 or "05"); non-numeric input is rejected.
+- Closing the balances sheet with unsaved changes asks before discarding them.
+
+---
+
+## [0.5.0] - 2026-09-28
+
+### Added
+- **Edit expenses**: Tap any transaction to open it in the add sheet, pre-filled. Save changes updates it in place; Delete removes it with the 5-second Undo. Failed edits roll back with a Retry toast.
+- **App icons**: Home-screen icons for iOS (`apple-icon.png`) and Android/manifest (192px, 512px, maskable), plus a browser favicon.
+
+### Fixed
+- The add sheet now always opens empty, so an amount or note typed earlier can't carry over into a new expense.
 
 ---
 
