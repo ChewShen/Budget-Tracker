@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { DefaultDateMode, getDefaultDateMode, setDefaultDateMode } from "@/lib/preferences";
 import { CategoryManager } from "@/components/category-manager";
+import { BillsManager } from "@/components/bills-manager";
 
 const DATE_OPTIONS: { value: DefaultDateMode; label: string; description: string }[] = [
   {
@@ -45,7 +46,7 @@ export default function SettingsPage() {
     <div className="mx-auto max-w-2xl space-y-4 sm:space-y-5">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Preferences, categories and account</p>
+        <p className="mt-1 text-sm text-muted-foreground">Preferences, bills, categories and account</p>
       </div>
 
       <section className="card p-5 sm:p-6">
@@ -85,6 +86,8 @@ export default function SettingsPage() {
           })}
         </div>
       </section>
+
+      <BillsManager />
 
       <CategoryManager />
 

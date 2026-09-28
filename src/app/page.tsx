@@ -8,7 +8,7 @@ import { MonthSelector } from "@/components/month-selector";
 import { KpiCards } from "@/components/kpi-cards";
 import { SpendHero } from "@/components/spend-hero";
 import { SalaryEngine } from "@/components/salary-engine";
-import { RecurringSentinel } from "@/components/recurring-sentinel";
+import { RecurringSentinel, type BillStatus } from "@/components/recurring-sentinel";
 import { CategoryChart } from "@/components/category-chart";
 import { TagsBarChart } from "@/components/tags-bar-chart";
 import { LedgerTable } from "@/components/ledger-table";
@@ -17,17 +17,6 @@ import {
   calculateSalaryMetrics,
 } from "@/lib/formulas";
 
-// Recurring bill tags to monitor
-const RECURRING_TAGS = [
-  "Netflix",
-  "iCloud",
-  "Youtube Premium",
-  "Youtube Membership",
-  "Cuckoo",
-  "Electric",
-  "Water",
-  "Season Parking",
-];
 
 
 export default function DashboardPage() {
@@ -40,6 +29,7 @@ export default function DashboardPage() {
     profile,
     updateProfile,
     tags,
+    bills,
     addTransaction,
     showToast,
   } = useBudget();
@@ -116,41 +106,64 @@ export default function DashboardPage() {
     value: Math.round(value * 100) / 100,
   }));
 
-  // 7. Recurring Sentinel Status
-  const loggedTagsInMonth = new Set(
-    monthTransactions.map((t) => t.tag_name)
-  );
-  const recurringStatus = RECURRING_TAGS.map((tag) => ({
-    tag_name: tag,
-    isLogged: loggedTagsInMonth.has(tag),
-  }));
-
-  // Missing bills that can be logged in one tap: reuse the amount and day of the last payment.
+  // 7. Monthly bills: matched by tag id, so renaming a tag doesn't break them.
   const daysInSelectedMonth = getDaysInMonth(monthDate);
   const todayStr = format(new Date(), "yyyy-MM-dd");
-  const missingBills = recurringStatus
-    .filter((r) => !r.isLogged)
-    .flatMap((r) => {
-      const tag = tags.find((t) => t.name === r.tag_name);
+  const currentMonthStr = todayStr.slice(0, 7);
+  const loggedTagIds = new Set(monthTransactions.map((t) => t.tag_id));
+  const dayStr = (day: number) =>
+    `${selectedMonth}-${String(Math.min(day, daysInSelectedMonth)).padStart(2, "0")}`;
+
+  const billRows = bills
+    .filter((b) => b.is_active)
+    .flatMap((bill) => {
+      const tag = tags.find((t) => t.id === bill.tag_id);
       if (!tag) return [];
+      const isLogged = loggedTagIds.has(tag.id);
+      const dueDate = bill.due_day ? dayStr(bill.due_day) : null;
+      const daysLeft = dueDate
+        ? Math.round((new Date(dueDate + "T00:00:00").getTime() - new Date(todayStr + "T00:00:00").getTime()) / 86400000)
+        : null;
+
+      let status: BillStatus = "missing";
+      if (isLogged) status = "logged";
+      else if (selectedMonth > currentMonthStr) status = "upcoming";
+      else if (selectedMonth === currentMonthStr) {
+        if (daysLeft === null) status = "missing";
+        else if (daysLeft < 0) status = "overdue";
+        else if (daysLeft <= 3) status = "due-soon";
+        else status = "upcoming";
+      }
+
+      // What "Log missing bills" would enter: expected amount, else the last payment.
       const last = transactions
         .filter((t) => t.tag_id === tag.id && t.date < `${selectedMonth}-01`)
         .sort((a, b) => b.date.localeCompare(a.date))[0];
-      if (!last) return [];
-      const day = Math.min(Number(last.date.slice(8, 10)), daysInSelectedMonth);
-      const date = `${selectedMonth}-${String(day).padStart(2, "0")}`;
+      const amount = bill.expected_amount ?? last?.amount ?? null;
+      const rawDate = dueDate ?? (last ? dayStr(Number(last.date.slice(8, 10))) : null) ?? todayStr;
       return [
         {
-          tag_name: tag.name,
-          amount: last.amount,
-          date: date > todayStr ? todayStr : date,
-          category_id: tag.category_id,
+          id: bill.id,
           tag_id: tag.id,
+          category_id: tag.category_id,
+          tag_name: tag.name,
+          status,
+          daysLeft,
+          dueDate,
+          amount,
+          date: rawDate > todayStr ? todayStr : rawDate,
         },
       ];
-    });
-  // Don't offer to log bills into a future month.
-  const loggableBills = selectedMonth > todayStr.slice(0, 7) ? [] : missingBills;
+    })
+    .sort((a, b) => a.tag_name.localeCompare(b.tag_name));
+
+  // Don't offer to log bills into a future month, or ones with no known amount.
+  const loggableBills =
+    selectedMonth > currentMonthStr
+      ? []
+      : billRows
+          .filter((r) => r.status !== "logged" && r.amount !== null)
+          .map((r) => ({ ...r, amount: r.amount as number }));
 
   const handleLogMissingBills = () => {
     loggableBills.forEach((b) =>
@@ -253,7 +266,7 @@ export default function DashboardPage() {
           onSaveProfile={updateProfile}
         />
         <RecurringSentinel
-          items={recurringStatus}
+          items={billRows}
           loggableBills={loggableBills}
           onLogMissing={handleLogMissingBills}
         />
