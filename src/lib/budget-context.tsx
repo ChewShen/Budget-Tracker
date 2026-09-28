@@ -12,7 +12,7 @@ import {
 import { createClient } from "./supabase/client";
 import { isSupabaseConfigured } from "./supabase/config";
 
-type NewTransaction = {
+export type NewTransaction = {
   amount: number;
   date: string;
   category_id: string;
@@ -43,6 +43,7 @@ interface BudgetContextType {
   selectedMonth: string; // YYYY-MM
   setSelectedMonth: (month: string) => void;
   addTransaction: (tx: NewTransaction) => Promise<void>;
+  updateTransaction: (id: string, tx: NewTransaction) => Promise<void>;
   deleteTransaction: (id: string) => Promise<void>;
   updateSavings: (savings: MonthlySavings) => Promise<void>;
   profile: UserSalaryProfile;
@@ -242,6 +243,54 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const updateTransaction = async (id: string, txInput: NewTransaction) => {
+    const previous = transactions.find((t) => t.id === id);
+    if (!previous) return;
+
+    // A just-added row keeps its temporary id until the insert returns; updating it now would miss.
+    if (isSupabaseConfigured && id.startsWith("tx-")) {
+      showToast({ tone: "error", message: "Still saving that entry. Try again in a moment." });
+      return;
+    }
+
+    const cat = categories.find((c) => c.id === txInput.category_id);
+    const tag = tags.find((t) => t.id === txInput.tag_id);
+    const updated: Transaction = {
+      ...previous,
+      ...txInput,
+      description: txInput.description,
+      category_name: cat?.name || previous.category_name,
+      tag_name: tag?.name || previous.tag_name,
+    };
+
+    setTransactions((prev) => prev.map((t) => (t.id === id ? updated : t)));
+    setSelectedMonth(txInput.date.slice(0, 7));
+
+    if (isSupabaseConfigured) {
+      const { error } = await createClient()
+        .from("transactions")
+        .update({
+          date: txInput.date,
+          category_id: txInput.category_id,
+          tag_id: txInput.tag_id,
+          amount: txInput.amount,
+          description: txInput.description ?? null,
+          is_one_off: txInput.is_one_off,
+        })
+        .eq("id", id);
+
+      if (error) {
+        console.error("Supabase update error:", error);
+        setTransactions((prev) => prev.map((t) => (t.id === id ? previous : t)));
+        showToast({
+          tone: "error",
+          message: `Couldn't save changes to ${updated.tag_name}`,
+          action: { label: "Retry", onClick: () => updateTransaction(id, txInput) },
+        });
+      }
+    }
+  };
+
   // Deletes are delayed by UNDO_MS so the Undo toast can cancel them before they reach the database.
   const pendingDelete = useRef<{ tx: Transaction; timer: ReturnType<typeof setTimeout> } | null>(null);
 
@@ -385,6 +434,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
         selectedMonth,
         setSelectedMonth,
         addTransaction,
+        updateTransaction,
         deleteTransaction,
         updateSavings,
         profile,
