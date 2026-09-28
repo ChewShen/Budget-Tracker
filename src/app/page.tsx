@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Download } from "lucide-react";
+import { ArrowRight } from "lucide-react";
+import { ExportMenu } from "@/components/export-menu";
 import { format, getDaysInMonth, parse, subMonths } from "date-fns";
 import { useBudget } from "@/lib/budget-context";
 import { MonthSelector } from "@/components/month-selector";
@@ -229,28 +230,6 @@ export default function DashboardPage() {
     });
   };
 
-  const handleExportCsv = () => {
-    const headers = ["Date", "Category", "Tag", "Description", "Amount", "One-off"];
-    const rows = transactions.map((t) => [
-      t.date,
-      t.category_name,
-      t.tag_name,
-      `"${t.description || ""}"`,
-      t.amount,
-      t.is_one_off ? "Y" : "N",
-    ]);
-    const csvContent =
-      "data:text/csv;charset=utf-8," +
-      [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `budget_backup_${selectedMonth}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
   return (
     <div className="space-y-4 sm:space-y-5">
       {/* Header */}
@@ -272,14 +251,7 @@ export default function DashboardPage() {
             />
             {isSyncedWithSupabase ? "Synced" : "Local only"}
           </span>
-          <button
-            onClick={handleExportCsv}
-            className="flex h-9 items-center gap-1.5 rounded-full px-3 text-xs font-medium text-muted-foreground transition hover:bg-secondary hover:text-foreground"
-            title="Export all transactions as CSV"
-          >
-            <Download className="h-4 w-4" />
-            <span className="hidden sm:inline">Export</span>
-          </button>
+          <ExportMenu />
         </div>
       </div>
 
