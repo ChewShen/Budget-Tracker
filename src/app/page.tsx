@@ -1,14 +1,30 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Download } from "lucide-react";
+import { ArrowRight } from "lucide-react";
+import { ExportMenu } from "@/components/export-menu";
 import { format, getDaysInMonth, parse, subMonths } from "date-fns";
 import { useBudget } from "@/lib/budget-context";
 import { MonthSelector } from "@/components/month-selector";
 import { KpiCards } from "@/components/kpi-cards";
 import { SpendHero } from "@/components/spend-hero";
 import { SalaryEngine } from "@/components/salary-engine";
-import { RecurringSentinel } from "@/components/recurring-sentinel";
+import { RecurringSentinel, type BillStatus } from "@/components/recurring-sentinel";
+import { canAutoLog } from "@/lib/bills";
+import {
+  baseline,
+  monthForecast,
+  monthInsights,
+  monthProgress,
+  monthlyTotals,
+  spendSplit,
+  yearToDate,
+} from "@/lib/analytics";
+import { YearToDateCard } from "@/components/year-to-date";
+import { SpendSplitCard } from "@/components/spend-split";
+import { SpendingCalendar } from "@/components/spending-calendar";
+import { InsightsCard } from "@/components/insights-card";
+import { SpendingTrend } from "@/components/spending-trend";
 import { CategoryChart } from "@/components/category-chart";
 import { TagsBarChart } from "@/components/tags-bar-chart";
 import { LedgerTable } from "@/components/ledger-table";
@@ -16,19 +32,6 @@ import {
   calculateDailyAverage,
   calculateSalaryMetrics,
 } from "@/lib/formulas";
-
-// Recurring bill tags to monitor
-const RECURRING_TAGS = [
-  "Netflix",
-  "iCloud",
-  "Youtube Premium",
-  "Youtube Membership",
-  "Cuckoo",
-  "Electric",
-  "Water",
-  "Season Parking",
-];
-
 
 export default function DashboardPage() {
   const {
@@ -40,6 +43,7 @@ export default function DashboardPage() {
     profile,
     updateProfile,
     tags,
+    bills,
     addTransaction,
     showToast,
   } = useBudget();
@@ -65,10 +69,14 @@ export default function DashboardPage() {
   const dailySeries = Array.from({ length: getDaysInMonth(monthDate) }, (_, i) => ({
     day: i + 1,
     amount: 0,
+    count: 0,
   }));
   monthTransactions.forEach((t) => {
     const day = Number(t.date.slice(8, 10));
-    if (dailySeries[day - 1]) dailySeries[day - 1].amount += t.amount;
+    if (dailySeries[day - 1]) {
+      dailySeries[day - 1].amount += t.amount;
+      dailySeries[day - 1].count += 1;
+    }
   });
 
   // 2. Daily Average (excluding one-off)
@@ -98,10 +106,16 @@ export default function DashboardPage() {
     const cName = t.category_name || "Others";
     catMap[cName] = (catMap[cName] || 0) + t.amount;
   });
+  // Compared with the 3-month average, pro-rated to today for the current month.
+  const categoryBaseline = baseline(transactions, selectedMonth, (t) => t.category_name || "Others");
+  const progress = monthProgress(selectedMonth, format(new Date(), "yyyy-MM-dd"));
   const categoryChartData = Object.entries(catMap)
     .map(([name, value]) => ({
       name,
       value: Math.round(value * 100) / 100,
+      usual: categoryBaseline.monthsUsed
+        ? Math.round((categoryBaseline.average.get(name) || 0) * progress * 100) / 100
+        : undefined,
     }))
     .sort((a, b) => b.value - a.value);
 
@@ -116,41 +130,91 @@ export default function DashboardPage() {
     value: Math.round(value * 100) / 100,
   }));
 
-  // 7. Recurring Sentinel Status
-  const loggedTagsInMonth = new Set(
-    monthTransactions.map((t) => t.tag_name)
-  );
-  const recurringStatus = RECURRING_TAGS.map((tag) => ({
-    tag_name: tag,
-    isLogged: loggedTagsInMonth.has(tag),
-  }));
-
-  // Missing bills that can be logged in one tap: reuse the amount and day of the last payment.
+  // 7. Monthly bills: matched by tag id, so renaming a tag doesn't break them.
+  const billTagIds = new Set(bills.map((b) => b.tag_id));
   const daysInSelectedMonth = getDaysInMonth(monthDate);
   const todayStr = format(new Date(), "yyyy-MM-dd");
-  const missingBills = recurringStatus
-    .filter((r) => !r.isLogged)
-    .flatMap((r) => {
-      const tag = tags.find((t) => t.name === r.tag_name);
+  const currentMonthStr = todayStr.slice(0, 7);
+  const loggedTagIds = new Set(monthTransactions.map((t) => t.tag_id));
+  const dayStr = (day: number) =>
+    `${selectedMonth}-${String(Math.min(day, daysInSelectedMonth)).padStart(2, "0")}`;
+
+  const billRows = bills
+    .filter((b) => b.is_active)
+    .flatMap((bill) => {
+      const tag = tags.find((t) => t.id === bill.tag_id);
       if (!tag) return [];
+      const isLogged = loggedTagIds.has(tag.id);
+      const dueDate = bill.due_day ? dayStr(bill.due_day) : null;
+      const daysLeft = dueDate
+        ? Math.round((new Date(dueDate + "T00:00:00").getTime() - new Date(todayStr + "T00:00:00").getTime()) / 86400000)
+        : null;
+
+      // Auto bills are added by the daily job (or on open in local-only mode), so they aren't "due".
+      const isAuto = Boolean(bill.auto_log && canAutoLog(bill));
+
+      let status: BillStatus = "missing";
+      if (isLogged) status = "logged";
+      else if (isAuto && selectedMonth >= currentMonthStr)
+        status = selectedMonth > currentMonthStr || (daysLeft ?? 0) > 0 ? "auto" : "auto-pending";
+      else if (selectedMonth > currentMonthStr) status = "upcoming";
+      else if (selectedMonth === currentMonthStr) {
+        if (daysLeft === null) status = "missing";
+        else if (daysLeft < 0) status = "overdue";
+        else if (daysLeft <= 3) status = "due-soon";
+        else status = "upcoming";
+      }
+
+      // What "Log missing bills" would enter: expected amount, else the last payment.
       const last = transactions
         .filter((t) => t.tag_id === tag.id && t.date < `${selectedMonth}-01`)
         .sort((a, b) => b.date.localeCompare(a.date))[0];
-      if (!last) return [];
-      const day = Math.min(Number(last.date.slice(8, 10)), daysInSelectedMonth);
-      const date = `${selectedMonth}-${String(day).padStart(2, "0")}`;
+      const amount = bill.expected_amount ?? last?.amount ?? null;
+      const rawDate = dueDate ?? (last ? dayStr(Number(last.date.slice(8, 10))) : null) ?? todayStr;
       return [
         {
-          tag_name: tag.name,
-          amount: last.amount,
-          date: date > todayStr ? todayStr : date,
-          category_id: tag.category_id,
+          id: bill.id,
           tag_id: tag.id,
+          category_id: tag.category_id,
+          tag_name: tag.name,
+          status,
+          daysLeft,
+          dueDate,
+          amount,
+          date: rawDate > todayStr ? todayStr : rawDate,
         },
       ];
-    });
-  // Don't offer to log bills into a future month.
-  const loggableBills = selectedMonth > todayStr.slice(0, 7) ? [] : missingBills;
+    })
+    .sort((a, b) => a.tag_name.localeCompare(b.tag_name));
+
+  // Don't offer to log bills into a future month, or ones with no known amount.
+  const loggableBills =
+    selectedMonth > currentMonthStr
+      ? []
+      : billRows
+          .filter((r) => r.status !== "logged" && r.status !== "auto" && r.status !== "auto-pending" && r.amount !== null)
+          .map((r) => ({ ...r, amount: r.amount as number }));
+
+  // 8. Month-end forecast (current month only). Bills still to come use their known amount.
+  const forecast = monthForecast(
+    monthTransactions,
+    selectedMonth,
+    todayStr,
+    billTagIds,
+    billRows.filter((r) => r.status !== "logged" && r.amount !== null).reduce((sum, r) => sum + (r.amount as number), 0)
+  );
+
+  // 9. Monthly trend ending at the selected month; average over completed months only.
+  const trend = monthlyTotals(transactions, selectedMonth).map((m) => {
+    const projectedRest = forecast && m.month === selectedMonth ? Math.max(0, forecast.projected - m.total) : 0;
+    return { ...m, projectedRest, projectedTotal: m.total + projectedRest };
+  });
+  const completed = trend.filter((m) => m.month < currentMonthStr && m.total > 0);
+  // Needs a completed month other than the selected one, or it only compares the month with itself.
+  const trendAverage =
+    completed.some((m) => m.month !== selectedMonth)
+      ? Math.round((completed.reduce((sum, m) => sum + m.total, 0) / completed.length) * 100) / 100
+      : null;
 
   const handleLogMissingBills = () => {
     loggableBills.forEach((b) =>
@@ -166,28 +230,6 @@ export default function DashboardPage() {
       tone: "default",
       message: `Logged ${loggableBills.length} bill${loggableBills.length === 1 ? "" : "s"}`,
     });
-  };
-
-  const handleExportCsv = () => {
-    const headers = ["Date", "Category", "Tag", "Description", "Amount", "One-off"];
-    const rows = transactions.map((t) => [
-      t.date,
-      t.category_name,
-      t.tag_name,
-      `"${t.description || ""}"`,
-      t.amount,
-      t.is_one_off ? "Y" : "N",
-    ]);
-    const csvContent =
-      "data:text/csv;charset=utf-8," +
-      [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `budget_backup_${selectedMonth}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
   };
 
   return (
@@ -211,14 +253,7 @@ export default function DashboardPage() {
             />
             {isSyncedWithSupabase ? "Synced" : "Local only"}
           </span>
-          <button
-            onClick={handleExportCsv}
-            className="flex h-9 items-center gap-1.5 rounded-full px-3 text-xs font-medium text-muted-foreground transition hover:bg-secondary hover:text-foreground"
-            title="Export all transactions as CSV"
-          >
-            <Download className="h-4 w-4" />
-            <span className="hidden sm:inline">Export</span>
-          </button>
+          <ExportMenu />
         </div>
       </div>
 
@@ -228,6 +263,8 @@ export default function DashboardPage() {
         previousSpend={previousSpend}
         transactionCount={monthTransactions.length}
         daily={dailySeries}
+        forecast={forecast}
+        monthEndLabel={format(new Date(`${selectedMonth}-${String(daysInSelectedMonth).padStart(2, "0")}T00:00:00`), "d MMM")}
       />
 
       <KpiCards
@@ -238,8 +275,21 @@ export default function DashboardPage() {
         savingsRate={salaryMetrics.savingsRate}
       />
 
+      <InsightsCard insights={monthInsights(transactions, selectedMonth, todayStr)} />
+
+      <SpendingTrend
+        data={trend}
+        average={trendAverage}
+        selectedMonth={selectedMonth}
+        onSelectMonth={setSelectedMonth}
+      />
+
       <div className="grid grid-cols-1 gap-4 sm:gap-5 lg:grid-cols-2">
-        <CategoryChart data={categoryChartData} />
+        <CategoryChart
+          data={categoryChartData}
+          baselineMonths={categoryBaseline.monthsUsed}
+          isMonthToDate={progress < 1}
+        />
         <TagsBarChart data={tagChartData} />
         <SalaryEngine
           gross={salaryMetrics.gross}
@@ -253,10 +303,18 @@ export default function DashboardPage() {
           onSaveProfile={updateProfile}
         />
         <RecurringSentinel
-          items={recurringStatus}
+          items={billRows}
           loggableBills={loggableBills}
           onLogMissing={handleLogMissingBills}
         />
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:gap-5 lg:grid-cols-2">
+        <SpendingCalendar month={selectedMonth} today={todayStr} days={dailySeries} />
+        <div className="space-y-4 sm:space-y-5">
+          <SpendSplitCard split={spendSplit(monthTransactions, billTagIds)} />
+          <YearToDateCard ytd={yearToDate(transactions, selectedMonth, salaryMetrics.netSalary)} />
+        </div>
       </div>
 
       {/* Recent transactions */}

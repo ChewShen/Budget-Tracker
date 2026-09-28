@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { X, Delete, Trash2 } from "lucide-react";
+import { X, Delete, Plus, Trash2 } from "lucide-react";
 import { categoryIcon, categoryLabel } from "@/lib/categories";
 import { format, subDays } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
-import { Transaction } from "@/lib/types";
-import type { NewTransaction } from "@/lib/budget-context";
+import { Category, Transaction } from "@/lib/types";
+import { useBudget, type NewTransaction } from "@/lib/budget-context";
 import { getDefaultDateMode, getLastEntryDate, setLastEntryDate } from "@/lib/preferences";
 
 // Food tag most likely for the current time of day (used as the default when the sheet opens).
@@ -24,7 +24,7 @@ const RECENT_LIMIT = 6;
 interface QuickAddModalProps {
   isOpen: boolean;
   onClose: () => void;
-  categories: { id: string; name: string }[];
+  categories: Category[];
   tags: { id: string; category_id: string; name: string }[];
   transactions: Transaction[];
   // When set, the sheet edits this entry instead of adding a new one.
@@ -59,6 +59,8 @@ export function QuickAddModal({
   const [description, setDescription] = useState("");
   const [isOneOff, setIsOneOff] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [newTagName, setNewTagName] = useState<string | null>(null); // null = "+ New tag" closed
+  const { addTag } = useBudget();
 
   // Most-used tags in the last 90 days, each with its most recent amount.
   const recents = useMemo(() => {
@@ -83,6 +85,7 @@ export function QuickAddModal({
   // (falling back to the last-used tag, then the first category).
   useEffect(() => {
     if (!isOpen || categories.length === 0) return;
+    setNewTagName(null);
 
     if (editing) {
       setAmountStr(Number.isInteger(editing.amount) ? String(editing.amount) : editing.amount.toFixed(2));
@@ -128,6 +131,7 @@ export function QuickAddModal({
 
   // Picking a category also picks its first tag (set together to avoid effects racing each other).
   const selectCategory = (categoryId: string) => {
+    setNewTagName(null);
     setSelectedCategoryId(categoryId);
     setSelectedTagId(tags.find((t) => t.category_id === categoryId)?.id || "");
   };
@@ -189,6 +193,15 @@ export function QuickAddModal({
     setIsOneOff(false);
     setIsSubmitting(false);
     onClose();
+  };
+
+  const createTag = async () => {
+    if (!newTagName?.trim()) return setNewTagName(null);
+    const tag = await addTag(selectedCategoryId, newTagName);
+    if (tag) {
+      setSelectedTagId(tag.id);
+      setNewTagName(null);
+    }
   };
 
   const handleDelete = () => {
@@ -265,7 +278,7 @@ export function QuickAddModal({
           {/* Category */}
           <div className="-mx-5 flex gap-1.5 overflow-x-auto px-5 scrollbar-none pointer-fine:mx-0 pointer-fine:flex-wrap pointer-fine:overflow-visible pointer-fine:px-0">
             {categories.map((cat) => {
-              const Icon = categoryIcon(cat.name);
+              const Icon = categoryIcon(cat.name, cat.icon);
               const isActive = selectedCategoryId === cat.id;
               return (
                 <button
@@ -301,6 +314,45 @@ export function QuickAddModal({
                 {tag.name}
               </button>
             ))}
+            {newTagName === null ? (
+              <button
+                type="button"
+                onClick={() => setNewTagName("")}
+                className="flex items-center gap-1 rounded-lg border border-dashed px-2.5 py-1 text-xs font-medium text-muted-foreground transition hover:text-foreground"
+              >
+                <Plus className="h-3 w-3" /> New tag
+              </button>
+            ) : (
+              <span className="flex items-center gap-1 rounded-lg border border-foreground/60 py-0.5 pl-2.5 pr-1">
+                <input
+                  autoFocus
+                  maxLength={40}
+                  placeholder="Tag name"
+                  aria-label="New tag name"
+                  value={newTagName}
+                  onChange={(e) => setNewTagName(e.target.value)}
+                  onKeyDown={(e) => {
+                    // Enter adds the tag instead of saving the expense; Escape closes only this box.
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      createTag();
+                    } else if (e.key === "Escape") {
+                      e.stopPropagation();
+                      setNewTagName(null);
+                    }
+                  }}
+                  className="w-24 bg-transparent text-xs outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={createTag}
+                  disabled={!newTagName.trim()}
+                  className="rounded-md bg-primary px-2 py-0.5 text-xs font-semibold text-primary-foreground disabled:opacity-40"
+                >
+                  Add
+                </button>
+              </span>
+            )}
           </div>
 
           {/* Note, date, one-off */}

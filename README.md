@@ -91,7 +91,8 @@ create table public.user_profiles (
 create table public.categories (
   id uuid primary key default uuid_generate_v4(),
   name text not null unique,
-  color text default '#3b82f6'
+  color text default '#3b82f6',
+  icon text -- lucide icon key chosen in Settings; NULL = default by name
 );
 
 -- 4. Tags Taxonomy (Linked to Categories)
@@ -168,7 +169,13 @@ The seed script opens the tables so data can be loaded. Close them afterwards:
 2. **Authentication → Sign In / Providers → Email** → turn off **Allow new users to sign up**.
 3. Set your email in [`scripts/secure_rls.sql`](scripts/secure_rls.sql) and run it in the SQL Editor.
 
-This assigns all data to your user and replaces every policy with owner-only RLS. The app then requires sign-in (`/login`). **Do not re-run `seed_data.sql` afterwards**; it re-opens the tables.
+This assigns all data to your user and replaces every policy with owner-only RLS (categories and tags stay editable by the signed-in owner from **Settings → Categories & tags**). The app then requires sign-in (`/login`). **Do not re-run `seed_data.sql` afterwards**; it re-opens the tables.
+
+### 4. Migrations
+One-off SQL changes for existing databases live in [`scripts/migrations/`](scripts/migrations/). Run each new file once in the SQL Editor, in date order:
+- `2026-09-28_manage_categories_tags.sql`: adds `categories.icon` and lets the owner add, rename and delete categories and tags.
+- `2026-09-28_monthly_bills.sql`: adds expected amount and due day to `recurring_sentinel`, one row per bill, and carries over the 8 bills the app used to hard-code.
+- `2026-09-28_auto_bills.sql`: per-bill "Add automatically" switch and a daily `pg_cron` job (00:05 Malaysia time) that adds due auto bills. Needs the `pg_cron` extension (Dashboard → Database → Extensions).
 
 ---
 
