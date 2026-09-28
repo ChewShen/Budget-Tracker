@@ -7,6 +7,9 @@ import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis } from "rechar
 import { useBudget } from "@/lib/budget-context";
 import { MonthSelector } from "@/components/month-selector";
 import { BalancesSheet } from "@/components/balances-sheet";
+import { EmergencyFundCard } from "@/components/emergency-fund";
+import { AccountChanges } from "@/components/account-changes";
+import { SavingsRateTrend } from "@/components/savings-rate-trend";
 import { formatCurrency } from "@/lib/utils";
 import {
   calculateDigitalBankInterest,
@@ -15,11 +18,14 @@ import {
 } from "@/lib/formulas";
 import {
   draftFor,
+  averageMonthlySpend,
   latestBefore,
   liquidOf,
   netWorthOf,
   previousMonth,
+  reachMonth,
   recordedHistory,
+  savingPace,
   snapshotFor,
 } from "@/lib/savings";
 import { MonthlySavings } from "@/lib/types";
@@ -49,8 +55,17 @@ function TrendTooltip({
 }
 
 export default function SavingsPage() {
-  const { savings, transactions, selectedMonth, setSelectedMonth, updateSavings, profile, showToast } =
-    useBudget();
+  const {
+    savings,
+    transactions,
+    selectedMonth,
+    setSelectedMonth,
+    updateSavings,
+    profile,
+    showToast,
+    emergencyMonths,
+    setEmergencyMonths,
+  } = useBudget();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
 
   const monthDate = parse(`${selectedMonth}-01`, "yyyy-MM-dd", new Date());
@@ -67,7 +82,13 @@ export default function SavingsPage() {
   const totalSpend = transactions
     .filter((t) => t.date.startsWith(selectedMonth))
     .reduce((sum, t) => sum + t.amount, 0);
-  const { netCashSaved } = calculateSalaryMetrics(profile.default_gross_salary, totalSpend, profile);
+  const { netCashSaved, netSalary } = calculateSalaryMetrics(profile.default_gross_salary, totalSpend, profile);
+
+  // Emergency fund: liquid money vs average spending of completed months.
+  const spend = averageMonthlySpend(transactions, selectedMonth, format(new Date(), "yyyy-MM"));
+  const pace = savingPace(savings, selectedMonth, netSalary, spend.average);
+  const emergencyTarget = emergencyMonths * spend.average;
+  const reachBy = current ? reachMonth(selectedMonth, emergencyTarget - liquidOf(current), pace.perMonth) : null;
 
   const growth = current && prevAdjacent ? liquidOf(current) - liquidOf(prevAdjacent) : null;
   const untracked =
@@ -82,6 +103,18 @@ export default function SavingsPage() {
     short: format(parse(s.month, "yyyy-MM-dd", new Date()), "MMM"),
     value: Math.round(netWorthOf(s) * 100) / 100,
   }));
+
+  // Savings rate for up to 12 months with expenses, ending at the selected month.
+  const currentMonth = format(new Date(), "yyyy-MM");
+  const rateHistory = Array.from(new Set(transactions.map((t) => t.date.slice(0, 7))))
+    .filter((m) => m <= selectedMonth)
+    .sort()
+    .slice(-12)
+    .map((m) => {
+      const spent = transactions.filter((t) => t.date.startsWith(m)).reduce((sum, t) => sum + t.amount, 0);
+      const metrics = calculateSalaryMetrics(profile.default_gross_salary, spent, profile);
+      return { month: m, rate: metrics.savingsRate, saved: metrics.netCashSaved, inProgress: m === currentMonth };
+    });
 
   const handleSave = async (snapshot: MonthlySavings) => {
     setIsSheetOpen(false);
@@ -160,6 +193,26 @@ export default function SavingsPage() {
             </>
           )}
         </section>
+      )}
+
+      {current && (
+        <EmergencyFundCard
+          liquid={liquidOf(current)}
+          averageSpend={spend.average}
+          spendMonths={spend.months}
+          goalMonths={emergencyMonths}
+          onChangeGoal={setEmergencyMonths}
+          pace={pace}
+          reachBy={reachBy}
+        />
+      )}
+
+      {current && lastRecorded && (
+        <AccountChanges
+          current={current}
+          previous={lastRecorded}
+          previousLabel={format(parse(lastRecorded.month, "yyyy-MM-dd", new Date()), "MMMM")}
+        />
       )}
 
       {current && (
@@ -256,6 +309,15 @@ export default function SavingsPage() {
             </ResponsiveContainer>
           </div>
         </section>
+      )}
+
+      {rateHistory.length > 0 && (
+        <SavingsRateTrend
+          data={rateHistory}
+          target={20}
+          selectedMonth={selectedMonth}
+          onSelectMonth={setSelectedMonth}
+        />
       )}
 
       <BalancesSheet
