@@ -47,10 +47,10 @@ flowchart LR
 Before opening a PR or tagging a release, execute this verification sequence:
 
 ```bash
-npm run type-check              # Strict TypeScript type safety (tsc --noEmit)
-npm run lint                    # ESLint code quality rules
-node scripts/test_formulas.mjs  # Mathematical parity test against Excel ground truth
-npm run build                   # Next.js production build verification
+npm run type-check   # Strict TypeScript type safety (tsc --noEmit)
+npm run lint         # ESLint (flat config in eslint.config.mjs)
+npm test             # Formula parity with Excel (scripts/test_formulas.mjs)
+npm run build        # Next.js production build verification
 ```
 
 ### Checklist Criteria:
@@ -70,17 +70,20 @@ npm run build                   # Next.js production build verification
 
 ## 4. Deployment Pipeline (CI/CD)
 
-### Continuous Integration
-On every pull request to `dev` or `main`:
-1. Clean install dependencies (`npm ci`).
-2. Run ESLint.
-3. Run TypeScript typecheck.
-4. Run Next.js build.
+### Continuous Integration (GitHub Actions)
+[`.github/workflows/ci.yml`](../.github/workflows/ci.yml) runs on every pull request to `dev` or `main`, and on pushes to them:
+1. Clean install dependencies (`npm ci`, Node 22).
+2. TypeScript type-check.
+3. ESLint.
+4. Formula parity test against Excel (`npm test`); this is the one check Vercel does not run.
+
+The workflow does not build: Vercel already builds every push.
 
 ### Continuous Deployment (Vercel)
-* Merging to `main` triggers a production deployment on Vercel.
-* Vercel builds edge routes and static assets.
-* Deployment completes in under 60 seconds with **Zero-Downtime**.
+* Every push builds on Vercel; the build also type-checks and lints, so a broken build never goes live.
+* Pushes to `main` deploy to production; other branches (`dev`, `chewshen`) get a preview URL.
+* Preview deployments use the **same Supabase project** as production, so test data entered there is real data.
+* Environment variables (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`) are set in Vercel → Settings → Environment Variables.
 
 ---
 
@@ -111,8 +114,9 @@ After Vercel reports successful deployment:
 5. The previous working version is restored immediately worldwide.
 
 ### Database Backups
-* **Automated Cloud Backups**: Managed by Supabase.
-* **Manual Snapshot**: Back up data before major schema migrations:
+* **Supabase Free plan has no automatic backups** (daily backups start on the Pro plan). Take manual backups before schema changes.
+* **Transactions**: Overview → **Export** downloads all transactions as CSV.
+* **Everything** (transactions, savings, profile): Supabase Dashboard → Table Editor → each table → **Export to CSV**, or with the database connection string from Dashboard → Connect:
   ```bash
-  npm run export:csv  # or download CSV backup directly from web app
+  pg_dump "$DATABASE_URL" --schema=public --data-only > backup-$(date +%F).sql
   ```
