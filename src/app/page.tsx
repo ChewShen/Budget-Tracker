@@ -10,6 +10,7 @@ import { SpendHero } from "@/components/spend-hero";
 import { SalaryEngine } from "@/components/salary-engine";
 import { RecurringSentinel, type BillStatus } from "@/components/recurring-sentinel";
 import { canAutoLog } from "@/lib/bills";
+import { monthForecast } from "@/lib/analytics";
 import { CategoryChart } from "@/components/category-chart";
 import { TagsBarChart } from "@/components/tags-bar-chart";
 import { LedgerTable } from "@/components/ledger-table";
@@ -17,8 +18,6 @@ import {
   calculateDailyAverage,
   calculateSalaryMetrics,
 } from "@/lib/formulas";
-
-
 
 export default function DashboardPage() {
   const {
@@ -171,6 +170,15 @@ export default function DashboardPage() {
           .filter((r) => r.status !== "logged" && r.status !== "auto" && r.status !== "auto-pending" && r.amount !== null)
           .map((r) => ({ ...r, amount: r.amount as number }));
 
+  // 8. Month-end forecast (current month only). Bills still to come use their known amount.
+  const forecast = monthForecast(
+    monthTransactions,
+    selectedMonth,
+    todayStr,
+    new Set(bills.map((b) => b.tag_id)),
+    billRows.filter((r) => r.status !== "logged" && r.amount !== null).reduce((sum, r) => sum + (r.amount as number), 0)
+  );
+
   const handleLogMissingBills = () => {
     loggableBills.forEach((b) =>
       addTransaction({
@@ -247,6 +255,8 @@ export default function DashboardPage() {
         previousSpend={previousSpend}
         transactionCount={monthTransactions.length}
         daily={dailySeries}
+        forecast={forecast}
+        monthEndLabel={format(new Date(`${selectedMonth}-${String(daysInSelectedMonth).padStart(2, "0")}T00:00:00`), "d MMM")}
       />
 
       <KpiCards
