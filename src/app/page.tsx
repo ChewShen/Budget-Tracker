@@ -12,6 +12,7 @@ import { RecurringSentinel, type BillStatus } from "@/components/recurring-senti
 import { canAutoLog } from "@/lib/bills";
 import { baseline, monthForecast, monthInsights, monthProgress, monthlyTotals, spendSplit } from "@/lib/analytics";
 import { SpendSplitCard } from "@/components/spend-split";
+import { SpendingCalendar } from "@/components/spending-calendar";
 import { InsightsCard } from "@/components/insights-card";
 import { SpendingTrend } from "@/components/spending-trend";
 import { CategoryChart } from "@/components/category-chart";
@@ -58,10 +59,14 @@ export default function DashboardPage() {
   const dailySeries = Array.from({ length: getDaysInMonth(monthDate) }, (_, i) => ({
     day: i + 1,
     amount: 0,
+    count: 0,
   }));
   monthTransactions.forEach((t) => {
     const day = Number(t.date.slice(8, 10));
-    if (dailySeries[day - 1]) dailySeries[day - 1].amount += t.amount;
+    if (dailySeries[day - 1]) {
+      dailySeries[day - 1].amount += t.amount;
+      dailySeries[day - 1].count += 1;
+    }
   });
 
   // 2. Daily Average (excluding one-off)
@@ -322,6 +327,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:gap-5 lg:grid-cols-2">
+        <SpendingCalendar month={selectedMonth} today={todayStr} days={dailySeries} />
         <SpendSplitCard split={spendSplit(monthTransactions, billTagIds)} />
       </div>
 
