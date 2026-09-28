@@ -6,6 +6,7 @@ import { categoryIcon, categoryLabel } from "@/lib/categories";
 import { format, subDays } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
 import { Transaction } from "@/lib/types";
+import { getDefaultDateMode, getLastEntryDate, setLastEntryDate } from "@/lib/preferences";
 
 // Food tag most likely for the current time of day (used as the default when the sheet opens).
 function mealForHour(hour: number): string {
@@ -76,11 +77,13 @@ export function QuickAddModal({
       .map(({ tx }) => tx);
   }, [transactions]);
 
-  // Fresh defaults every time the sheet opens: today's date, and the meal for the current time
+  // Fresh defaults every time the sheet opens: today's date (or the last entry's date, per Settings),
+  // and the meal for the current time
   // (falling back to the last-used tag, then the first category).
   useEffect(() => {
     if (!isOpen || categories.length === 0) return;
-    setSelectedDate(format(new Date(), "yyyy-MM-dd"));
+    const today = format(new Date(), "yyyy-MM-dd");
+    setSelectedDate(getDefaultDateMode() === "last" ? getLastEntryDate() || today : today);
 
     const food = categories.find((c) => c.name.toLowerCase() === "food");
     const meal = food && tags.find((t) => t.category_id === food.id && t.name === mealForHour(new Date().getHours()));
@@ -151,6 +154,7 @@ export function QuickAddModal({
 
     // The row appears instantly; a failed save shows a Retry toast, so there's no need to wait here.
     setIsSubmitting(true);
+    setLastEntryDate(selectedDate);
     onSave({
       amount,
       date: selectedDate,
@@ -178,7 +182,7 @@ export function QuickAddModal({
         aria-modal="true"
         aria-label="Add expense"
         onClick={(e) => e.stopPropagation()}
-        className="max-h-[92dvh] w-full max-w-md animate-sheet-up overflow-y-auto rounded-t-3xl border bg-card px-5 pb-safe pt-3 shadow-2xl sm:rounded-3xl sm:pb-5"
+        className="max-h-[92dvh] w-full max-w-md animate-sheet-up sm:max-w-lg overflow-y-auto rounded-t-3xl border bg-card px-5 pb-safe pt-3 shadow-2xl sm:rounded-3xl sm:pb-5"
       >
         {/* Grabber (mobile) */}
         <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-border sm:hidden" />
@@ -214,7 +218,7 @@ export function QuickAddModal({
           {recents.length > 0 && (
             <div>
               <div className="mb-1.5 text-xs font-medium text-muted-foreground">Recent</div>
-              <div className="-mx-5 flex gap-1.5 overflow-x-auto px-5 scrollbar-none">
+              <div className="-mx-5 flex gap-1.5 overflow-x-auto px-5 scrollbar-none pointer-fine:mx-0 pointer-fine:flex-wrap pointer-fine:overflow-visible pointer-fine:px-0">
                 {recents.map((tx) => (
                   <button
                     key={tx.tag_id}
@@ -231,7 +235,7 @@ export function QuickAddModal({
           )}
 
           {/* Category */}
-          <div className="-mx-5 flex gap-1.5 overflow-x-auto px-5 scrollbar-none">
+          <div className="-mx-5 flex gap-1.5 overflow-x-auto px-5 scrollbar-none pointer-fine:mx-0 pointer-fine:flex-wrap pointer-fine:overflow-visible pointer-fine:px-0">
             {categories.map((cat) => {
               const Icon = categoryIcon(cat.name);
               const isActive = selectedCategoryId === cat.id;
@@ -254,7 +258,7 @@ export function QuickAddModal({
           </div>
 
           {/* Tags */}
-          <div className="flex max-h-[5.75rem] flex-wrap gap-1.5 overflow-y-auto">
+          <div className="flex max-h-[5.75rem] flex-wrap gap-1.5 overflow-y-auto pointer-fine:max-h-none">
             {availableTags.map((tag) => (
               <button
                 key={tag.id}
