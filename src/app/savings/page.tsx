@@ -9,6 +9,7 @@ import { MonthSelector } from "@/components/month-selector";
 import { BalancesSheet } from "@/components/balances-sheet";
 import { EmergencyFundCard } from "@/components/emergency-fund";
 import { AccountChanges } from "@/components/account-changes";
+import { SavingsRateTrend } from "@/components/savings-rate-trend";
 import { formatCurrency } from "@/lib/utils";
 import {
   calculateDigitalBankInterest,
@@ -102,6 +103,18 @@ export default function SavingsPage() {
     short: format(parse(s.month, "yyyy-MM-dd", new Date()), "MMM"),
     value: Math.round(netWorthOf(s) * 100) / 100,
   }));
+
+  // Savings rate for up to 12 months with expenses, ending at the selected month.
+  const currentMonth = format(new Date(), "yyyy-MM");
+  const rateHistory = Array.from(new Set(transactions.map((t) => t.date.slice(0, 7))))
+    .filter((m) => m <= selectedMonth)
+    .sort()
+    .slice(-12)
+    .map((m) => {
+      const spent = transactions.filter((t) => t.date.startsWith(m)).reduce((sum, t) => sum + t.amount, 0);
+      const metrics = calculateSalaryMetrics(profile.default_gross_salary, spent, profile);
+      return { month: m, rate: metrics.savingsRate, saved: metrics.netCashSaved, inProgress: m === currentMonth };
+    });
 
   const handleSave = async (snapshot: MonthlySavings) => {
     setIsSheetOpen(false);
@@ -296,6 +309,15 @@ export default function SavingsPage() {
             </ResponsiveContainer>
           </div>
         </section>
+      )}
+
+      {rateHistory.length > 0 && (
+        <SavingsRateTrend
+          data={rateHistory}
+          target={20}
+          selectedMonth={selectedMonth}
+          onSelectMonth={setSelectedMonth}
+        />
       )}
 
       <BalancesSheet
