@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { GUEST_COOKIE, enterGuest } from "@/lib/guest";
 
 // Email + password only. There is no sign-up: the single user is created in the
 // Supabase dashboard (Authentication -> Users -> Add user).
@@ -30,7 +31,8 @@ export default function LoginPage() {
       );
       return;
     }
-    // Full navigation so the middleware sees the new session cookie.
+    // Leave guest mode if it was on, then full navigation so the middleware sees the session cookie.
+    document.cookie = `${GUEST_COOKIE}=; path=/; max-age=0; SameSite=Lax`;
     window.location.replace("/");
   };
 
@@ -88,6 +90,22 @@ export default function LoginPage() {
         >
           {isBusy ? "Signing in…" : "Sign in"}
         </button>
+
+        <div className="flex items-center gap-3 pt-2 text-xs text-muted-foreground">
+          <span className="h-px flex-1 bg-border" />
+          or
+          <span className="h-px flex-1 bg-border" />
+        </div>
+        <button
+          type="button"
+          onClick={enterGuest}
+          className="h-11 w-full rounded-full border text-sm font-medium transition hover:bg-secondary"
+        >
+          Continue without an account
+        </button>
+        <p className="text-center text-xs text-muted-foreground">
+          Try it with sample data. Nothing you enter is saved, and a refresh starts over.
+        </p>
       </form>
     </div>
   );

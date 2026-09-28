@@ -46,6 +46,7 @@ export default function DashboardPage() {
     bills,
     addTransaction,
     showToast,
+    mode,
   } = useBudget();
 
   // Filter transactions for currently selected month (YYYY-MM)
@@ -244,14 +245,20 @@ export default function DashboardPage() {
         <div className="flex items-center gap-1">
           <span
             className="flex items-center gap-1.5 px-2 text-xs text-muted-foreground"
-            title={isSyncedWithSupabase ? "Synced with Supabase" : "Saved on this device only"}
+            title={
+              mode === "guest"
+                ? "Guest mode: nothing is saved"
+                : isSyncedWithSupabase
+                  ? "Synced with Supabase"
+                  : "Saved on this device only"
+            }
           >
             <span
               className={`h-1.5 w-1.5 rounded-full ${
-                isSyncedWithSupabase ? "bg-success" : "bg-muted-foreground"
+                mode === "guest" ? "bg-warning" : isSyncedWithSupabase ? "bg-success" : "bg-muted-foreground"
               }`}
             />
-            {isSyncedWithSupabase ? "Synced" : "Local only"}
+            {mode === "guest" ? "Not saved" : isSyncedWithSupabase ? "Synced" : "Local only"}
           </span>
           <ExportMenu />
         </div>
