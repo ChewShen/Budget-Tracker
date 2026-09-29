@@ -28,7 +28,7 @@ export type NewTransaction = {
 
 export type GoalInput = Pick<
   Goal,
-  "name" | "target_amount" | "trade_in_name" | "trade_in_value" | "trade_in_updated" | "target_date" | "link"
+  "name" | "target_amount" | "trade_in_name" | "trade_in_value" | "trade_in_updated" | "target_date" | "link" | "discounts"
 >;
 
 export type BillChanges = Partial<Pick<RecurringBill, "expected_amount" | "due_day" | "is_active" | "auto_log">>;
@@ -262,6 +262,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
           ...g,
           target_amount: Number(g.target_amount),
           trade_in_value: Number(g.trade_in_value || 0),
+          discounts: Array.isArray(g.discounts) ? g.discounts : [],
         }))
       );
       setGoalContributions((gcs.data || []).map((c: any) => ({ ...c, amount: Number(c.amount) })));
@@ -635,7 +636,12 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
     error.code === "42P01" || error.code === "PGRST205" || error.code === "PGRST204"
       ? "Run scripts/migrations/2026-09-29_goals.sql in Supabase first."
       : `Couldn't save ${what}.`;
-  const toGoal = (g: any): Goal => ({ ...g, target_amount: Number(g.target_amount), trade_in_value: Number(g.trade_in_value || 0) });
+  const toGoal = (g: any): Goal => ({
+    ...g,
+    target_amount: Number(g.target_amount),
+    trade_in_value: Number(g.trade_in_value || 0),
+    discounts: Array.isArray(g.discounts) ? g.discounts : [],
+  });
 
   const addGoal = async (input: GoalInput) => {
     const priority = goals.filter((g) => g.status === "active").reduce((max, g) => Math.max(max, g.priority + 1), 0);

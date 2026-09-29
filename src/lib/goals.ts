@@ -1,11 +1,30 @@
-import { differenceInCalendarMonths, format, parseISO } from "date-fns";
-import type { Goal, GoalContribution } from "./types";
+import { differenceInCalendarDays, differenceInCalendarMonths, format, parseISO } from "date-fns";
+import type { Goal, GoalContribution, GoalDiscount } from "./types";
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
-// What you actually need to save: the price minus what the trade-in should bring in.
-export const netTarget = (g: Pick<Goal, "target_amount" | "trade_in_value">) =>
-  round2(Math.max(0, g.target_amount - (g.trade_in_value || 0)));
+// RM a discount takes off; percentages are of the full price.
+export const discountAmount = (d: GoalDiscount, price: number) =>
+  round2(d.kind === "percent" ? (price * d.value) / 100 : d.value);
+
+export const isExpired = (d: GoalDiscount, today: Date = new Date()) =>
+  Boolean(d.expires_on) && (d.expires_on as string) < format(today, "yyyy-MM-dd");
+
+// Days until a voucher expires (0 = today), or null without an expiry date.
+export const daysToExpiry = (d: GoalDiscount, today: Date = new Date()) =>
+  d.expires_on ? differenceInCalendarDays(parseISO(d.expires_on), today) : null;
+
+export const activeDiscountTotal = (g: Pick<Goal, "target_amount" | "discounts">, today: Date = new Date()) =>
+  round2((g.discounts || []).filter((d) => !isExpired(d, today)).reduce((sum, d) => sum + discountAmount(d, g.target_amount), 0));
+
+// What you actually need to save: the price minus the trade-in and any discounts still valid.
+export const netTarget = (
+  g: Pick<Goal, "target_amount" | "trade_in_value"> & Partial<Pick<Goal, "discounts">>,
+  today: Date = new Date()
+) =>
+  round2(
+    Math.max(0, g.target_amount - (g.trade_in_value || 0) - activeDiscountTotal({ target_amount: g.target_amount, discounts: g.discounts || [] }, today))
+  );
 
 export const savedFor = (goalId: string, contributions: GoalContribution[]) =>
   round2(contributions.filter((c) => c.goal_id === goalId).reduce((sum, c) => sum + c.amount, 0));
@@ -32,7 +51,7 @@ export interface GoalProgress {
 }
 
 export function goalProgress(goal: Goal, contributions: GoalContribution[], today: Date = new Date()): GoalProgress {
-  const net = netTarget(goal);
+  const net = netTarget(goal, today);
   const saved = savedFor(goal.id, contributions);
   const remaining = round2(Math.max(0, net - saved));
   const isReady = saved >= net;

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { format, parseISO } from "date-fns";
 import { ArrowDown, ArrowUp, ExternalLink, History, Pencil, Plus, Trash2 } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
-import type { GoalProgress } from "@/lib/goals";
+import { daysToExpiry, discountAmount, isExpired, type GoalProgress } from "@/lib/goals";
 import type { Goal, GoalContribution } from "@/lib/types";
 
 interface GoalCardProps {
@@ -151,11 +151,53 @@ export function GoalCard({
         <div className="h-full rounded-full bg-primary transition-all duration-500" style={{ width: `${p.ratio * 100}%` }} />
       </div>
 
-      {goal.trade_in_value > 0 && (
-        <p className="mt-3 text-xs text-muted-foreground tabular-nums">
-          {formatCurrency(goal.target_amount)} − trade-in {formatCurrency(goal.trade_in_value)}
-          {tradeInDetails && ` (${tradeInDetails})`}
-        </p>
+      {(goal.trade_in_value > 0 || goal.discounts.length > 0) && (
+        <ul className="mt-3 space-y-0.5 text-xs text-muted-foreground tabular-nums" aria-label="How the target is worked out">
+          <li className="flex justify-between gap-3">
+            <span>Price</span>
+            <span>{formatCurrency(goal.target_amount)}</span>
+          </li>
+          {goal.trade_in_value > 0 && (
+            <li className="flex justify-between gap-3">
+              <span className="truncate">Trade-in{tradeInDetails && ` (${tradeInDetails})`}</span>
+              <span className="shrink-0">−{formatCurrency(goal.trade_in_value)}</span>
+            </li>
+          )}
+          {goal.discounts.map((d) => {
+            const expired = isExpired(d);
+            const days = daysToExpiry(d);
+            const soon = !expired && days !== null && days <= 7;
+            return (
+              <li key={d.id} className={cn("flex justify-between gap-3", expired && "opacity-60")}>
+                <span className="truncate">
+                  <span className={cn(expired && "line-through")}>
+                    {d.label}
+                    {d.kind === "percent" && ` ${d.value}%`}
+                  </span>
+                  {d.expires_on && (
+                    <span className={cn(soon && "font-medium text-warning")}>
+                      {" · "}
+                      {expired
+                        ? `expired ${dayName(d.expires_on)}`
+                        : soon
+                          ? days === 0
+                            ? "expires today"
+                            : `expires in ${days} day${days === 1 ? "" : "s"}`
+                          : `expires ${dayName(d.expires_on)}`}
+                    </span>
+                  )}
+                </span>
+                <span className={cn("shrink-0", expired && "line-through")}>
+                  −{formatCurrency(discountAmount(d, goal.target_amount))}
+                </span>
+              </li>
+            );
+          })}
+          <li className="flex justify-between gap-3 border-t border-border/70 pt-1 font-medium text-foreground">
+            <span>To save</span>
+            <span>{formatCurrency(p.net)}</span>
+          </li>
+        </ul>
       )}
 
       <p className="mt-3 text-sm text-muted-foreground">

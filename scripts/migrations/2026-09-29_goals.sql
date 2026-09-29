@@ -32,6 +32,12 @@ CREATE TABLE IF NOT EXISTS public.goal_contributions (
 
 CREATE INDEX IF NOT EXISTS idx_goal_contributions_goal ON public.goal_contributions (goal_id);
 
+-- Discounts & vouchers on a goal: [{ id, label, kind: "amount" | "percent", value, expires_on }].
+-- Added separately so re-running this file also upgrades a goals table created before it existed.
+ALTER TABLE public.goals ADD COLUMN IF NOT EXISTS discounts jsonb NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE public.goals DROP CONSTRAINT IF EXISTS goals_discounts_is_array;
+ALTER TABLE public.goals ADD CONSTRAINT goals_discounts_is_array CHECK (jsonb_typeof(discounts) = 'array');
+
 -- Owner-only access, like every other table.
 ALTER TABLE public.goals              ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.goal_contributions ENABLE ROW LEVEL SECURITY;
@@ -47,6 +53,8 @@ CREATE POLICY "Owner manages goal contributions" ON public.goal_contributions
   FOR ALL TO authenticated
   USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
 
--- Check: both tables exist with RLS on.
+-- Check: both tables exist with RLS on, and goals has the discounts column.
 SELECT tablename, rowsecurity FROM pg_tables
 WHERE schemaname = 'public' AND tablename IN ('goals', 'goal_contributions');
+SELECT column_name, data_type FROM information_schema.columns
+WHERE table_schema = 'public' AND table_name = 'goals' AND column_name = 'discounts';

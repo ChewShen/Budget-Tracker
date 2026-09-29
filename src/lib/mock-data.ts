@@ -165,6 +165,10 @@ function buildGoals(today: Date): { goals: Goal[]; contributions: GoalContributi
       trade_in_name: "iPhone 13",
       trade_in_value: 1200,
       trade_in_updated: day(-1, 15),
+      discounts: [
+        { id: "disc-voucher", label: "11.11 voucher", kind: "amount", value: 200, expires_on: day(2, 11) },
+        { id: "disc-cashback", label: "Card cashback", kind: "percent", value: 5 },
+      ],
       target_date: day(6, 1),
       link: null,
       priority: 0,
@@ -175,6 +179,7 @@ function buildGoals(today: Date): { goals: Goal[]; contributions: GoalContributi
       name: "Japan trip",
       target_amount: 6000,
       trade_in_value: 0,
+      discounts: [],
       target_date: day(10, 1),
       link: null,
       priority: 1,

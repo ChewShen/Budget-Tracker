@@ -20,6 +20,14 @@ export interface RecurringBill {
   auto_log?: boolean; // added automatically on the due day (needs expected_amount + due_day)
 }
 
+export interface GoalDiscount {
+  id: string;
+  label: string; // e.g. "11.11 voucher", "Card cashback"
+  kind: "amount" | "percent"; // RM off, or % of the price
+  value: number;
+  expires_on?: string | null; // YYYY-MM-DD; expired discounts stop counting
+}
+
 export interface Goal {
   id: string;
   name: string;
@@ -27,6 +35,7 @@ export interface Goal {
   trade_in_name?: string | null; // what you'll trade in, e.g. "iPhone 13"
   trade_in_value: number; // expected trade-in value (0 = none)
   trade_in_updated?: string | null; // YYYY-MM-DD, when the value was last checked
+  discounts: GoalDiscount[];
   target_date?: string | null; // YYYY-MM-DD
   link?: string | null;
   priority: number; // lower = higher on the list

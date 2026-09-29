@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { X } from "lucide-react";
 import { categoryLabel } from "@/lib/categories";
-import { netTarget } from "@/lib/goals";
+import { isExpired, netTarget } from "@/lib/goals";
 import { formatCurrency } from "@/lib/utils";
 import type { NewTransaction } from "@/lib/budget-context";
 import type { Category, Goal, Tag } from "@/lib/types";
@@ -106,10 +106,12 @@ export function BoughtSheet({ goal, categories, tags, onClose, onConfirm }: Boug
               className="field mt-1 text-lg font-semibold tabular-nums"
               aria-label="Amount paid"
             />
-            {goal.trade_in_value > 0 && (
+            {(goal.trade_in_value > 0 || goal.discounts.some((d) => !isExpired(d))) && (
               <span className="mt-1 block text-xs text-muted-foreground">
-                {formatCurrency(goal.target_amount)} minus {formatCurrency(goal.trade_in_value)} trade-in. Change it if
-                the real offer was different.
+                {formatCurrency(goal.target_amount)} minus
+                {goal.trade_in_value > 0 && ` ${formatCurrency(goal.trade_in_value)} trade-in`}
+                {goal.trade_in_value > 0 && goal.discounts.some((d) => !isExpired(d)) && " and"}
+                {goal.discounts.some((d) => !isExpired(d)) && " discounts"}. Change it if what you paid was different.
               </span>
             )}
           </label>
