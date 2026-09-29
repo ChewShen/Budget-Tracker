@@ -120,7 +120,7 @@ export function GoalSheet({ isOpen, goal, onClose, onSave, onDelete }: GoalSheet
         aria-modal="true"
         aria-label={goal ? "Edit goal" : "New goal"}
         onClick={(e) => e.stopPropagation()}
-        className="max-h-[92dvh] w-full max-w-md animate-sheet-up overflow-y-auto rounded-t-3xl border bg-card px-5 pb-safe pt-3 shadow-2xl sm:max-w-lg sm:rounded-3xl sm:pb-5"
+        className="max-h-sheet w-full max-w-md animate-sheet-up overflow-y-auto rounded-t-3xl border bg-card px-5 pb-safe pt-3 shadow-2xl sm:max-w-lg sm:rounded-3xl sm:pb-5"
       >
         <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-border sm:hidden" />
         <div className="flex items-center justify-between">

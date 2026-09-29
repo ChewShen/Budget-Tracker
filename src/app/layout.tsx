@@ -15,7 +15,9 @@ export const metadata: Metadata = {
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "black-translucent",
+    // "black": iOS keeps its own status bar strip and the app starts below it. ("black-translucent"
+    // drew the page under the clock/notch, hiding the top bar, and its white text vanished in light mode.)
+    statusBarStyle: "black",
     title: "Budget",
   },
 };
