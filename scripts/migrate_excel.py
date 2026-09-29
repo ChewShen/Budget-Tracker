@@ -220,8 +220,14 @@ def generate_sql(categories, transactions, savings, output_sql_path):
         f.write("SELECT 'Monthly Savings:' AS entity, count(*) FROM public.monthly_savings;\n")
 
 if __name__ == "__main__":
-    excel_file = r"c:\Budget\Monthly Budget.xlsm"
-    out_sql = r"c:\Budget\scripts\seed_data.sql"
+    import sys
+
+    # Usage: python3 scripts/migrate_excel.py "path/to/Monthly Budget.xlsm" [scripts/seed_data.sql]
+    # The output holds your real data; it's gitignored, so it never ends up in the repo.
+    if len(sys.argv) < 2:
+        sys.exit('Usage: python3 scripts/migrate_excel.py "Monthly Budget.xlsm" [scripts/seed_data.sql]')
+    excel_file = sys.argv[1]
+    out_sql = sys.argv[2] if len(sys.argv) > 2 else os.path.join(os.path.dirname(__file__), "seed_data.sql")
     cats, txs, svs = parse_excel_budget(excel_file)
     generate_sql(cats, txs, svs, out_sql)
     print(f"Generated robust seed script: {out_sql}")

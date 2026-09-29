@@ -26,7 +26,7 @@ Hosted $100\%$ free on **Vercel** and **Supabase (PostgreSQL)** with no expiring
   - Flags each as **`Logged`** or **`MISSING`** for the active month.
 - **🔄 Two-Way Data Portability & Sync**:
   - Auto-syncs between client local storage and Supabase cloud PostgreSQL.
-  - Ingests all historical transactions and savings from `Monthly Budget.xlsm`.
+  - Imports historical transactions and savings from an Excel budget sheet (`scripts/migrate_excel.py`).
   - 1-click export to CSV at any time.
 
 ---
@@ -153,15 +153,18 @@ create policy "Allow all transactions access" on public.transactions for all usi
 create policy "Allow all savings access" on public.monthly_savings for all using (true) with check (true);
 ```
 
-### 2. Seed Data from `Monthly Budget.xlsm`
-To populate your cloud database with all historical transactions and categories:
-1. Open [`scripts/seed_data.sql`](scripts/seed_data.sql).
-2. Copy and paste the entire script into your Supabase SQL Editor $\to$ click **Run**.
-3. It will populate:
-   - **10 Categories**
-   - **31 Tags**
-   - **172 Historical Transactions**
-   - **5 Monthly Savings Snapshots**
+### 2. Import Your Spreadsheet (optional)
+To bring in history from an Excel budget sheet (same layout as `Monthly Budget.xlsm`):
+1. Generate a seed script from your file:
+   ```bash
+   python3 scripts/migrate_excel.py "path/to/Monthly Budget.xlsm"
+   ```
+   This writes `scripts/seed_data.sql` (categories, tags, transactions and savings snapshots).
+2. Paste it into the Supabase SQL Editor and click **Run**.
+
+Your spreadsheet and the generated `seed_data.sql` contain real financial data, so both are **gitignored**; keep them out of the repository.
+
+Without a spreadsheet, the app still works: add categories and tags in **Settings**, or try it first with **Continue without an account** (sample data, nothing saved).
 
 ### 3. Lock the Database to Your Account
 The seed script opens the tables so data can be loaded. Close them afterwards:
