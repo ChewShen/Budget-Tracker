@@ -1,6 +1,6 @@
 # 💰 Personal Monthly Budget & Wealth Tracker (Web & Mobile PWA)
 
-A full-stack, mobile-first personal finance application built to replace traditional Excel budget sheets (`Monthly Budget.xlsm`) with a real-time, cross-device web experience.
+A full-stack, mobile-first personal finance app that replaced my Excel budget sheet: log an expense in a few taps on the phone, and get the analytics a spreadsheet never gave me — where the month is heading, what's unusual, which bills are still unpaid and how long my savings would last.
 
 Hosted $100\%$ free on **Vercel** and **Supabase (PostgreSQL)** with no expiring trial periods or server costs.
 
@@ -16,30 +16,50 @@ On the sign-in page, choose **Continue without an account**. You get the full ap
 
 Guest mode never touches the database and stores nothing in your browser, so **nothing you enter is saved**: a refresh starts over.
 
+## 📸 Screenshots
+
+| Overview | Analytics |
+| :---: | :---: |
+| ![Overview: month total, forecast, daily spending and key stats](docs/screenshots/overview.png) | ![Insights, monthly trend and category comparison](docs/screenshots/analytics.png) |
+
+| Savings | Mobile | Add expense |
+| :---: | :---: | :---: |
+| ![Savings: net worth by account and emergency fund](docs/screenshots/savings.png) | ![Overview on a phone](docs/screenshots/mobile-overview.png) | ![Add expense sheet with recent shortcuts and numpad](docs/screenshots/mobile-add-expense.png) |
+
+*All screenshots use the app's made-up demo data.*
+
 ---
 
 ## 📱 Highlights & Features
 
-- **🎨 Fintech Brand Theme**: Styled with electric **Lime Spark (`#B6FF2E`)** and deep **Graphite (`#23262F`)** for a sleek, high-contrast neobank visual experience.
-- **⚡ 5-Second Mobile Quick-Add (PWA)**: Large tactile numpad, category-to-tag cascading picker, and "One-off?" toggle. Installable directly to iOS/Android home screens.
-- **📊 Dynamic Monthly Cockpit**: Replaces Excel Timeline Slicers with a responsive month selector that recalculates KPIs in real time:
-  - **Total Spend & Food Burn Rate**
-  - **Daily Average Spend**: Automatically excludes one-off spike expenses (`is_one_off = true`).
-  - **Peak Expense Spotlight**: Automatically detects and badges your highest monthly expense.
-- **🇲🇾 Malaysian Salary & Deductions Engine**:
-  - Automatically calculates **EPF (11%)**, **SOCSO**, and **EIS** from Gross Salary.
-  - Computes exact **Net Salary**, **Net Cash Saved**, and **Savings Rate %**.
-- **📈 Digital Bank Compound Interest Engine**:
-  - Tracks **GXBank (3.55% p.a.)**, **Rize/RYT Bank**, and checking accounts.
-  - Automatically calculates exact daily compounded interest based on calendar month days (`28–31`).
-  - **Untracked Cash Detector**: Reconciles net cash saved against real asset growth to identify unlogged cash leaks.
-- **🛡️ Recurring Bills Sentinel**:
-  - Monitors recurring expenses (*Netflix, iCloud, Cuckoo, Water, Electric, Season Parking*).
-  - Flags each as **`Logged`** or **`MISSING`** for the active month.
-- **🔄 Two-Way Data Portability & Sync**:
-  - Auto-syncs between client local storage and Supabase cloud PostgreSQL.
-  - Imports historical transactions and savings from an Excel budget sheet (`scripts/migrate_excel.py`).
-  - 1-click export to CSV at any time.
+### ⚡ Fast entry
+- **Add an expense in a few taps**: numpad sheet, **Recent** shortcuts (tag + last amount), and a tag picked for the time of day (breakfast, lunch, dinner…).
+- **Edit or delete** any entry, with a 5-second **Undo**; failed saves roll back with **Retry**.
+- **Your own categories and tags** (with icons), created in Settings or on the spot while adding.
+- Installable **PWA** for iOS/Android home screens; keyboard entry on desktop.
+
+### 📊 Analytics
+- **Month-end forecast**: "On pace for RM 2,084 by 30 Sep", from everyday spending plus bills still to come.
+- **Compared with usual**: each category against its 3-month average (pro-rated for the current month).
+- **Insights**: plain-English highlights such as tags above or below usual, no-spend days and weekend-heavy spending.
+- **Monthly trend**, **spending calendar** (days shaded by spend), **fixed vs flexible** split and **year to date**.
+
+### 🧾 Monthly bills
+- Choose which tags are monthly bills, with an optional **expected amount** and **due day**.
+- Overview shows **Logged / Due in 2 days / Overdue / Missing**, and logs unpaid bills in one tap.
+- **Auto-add** fixed bills on their due day via a daily **pg_cron** job in Postgres.
+
+### 🏦 Savings & salary
+- **Malaysian salary engine**: EPF, SOCSO and EIS deductions, take-home pay and savings rate (editable).
+- **Month-end balances** per account with daily-compounded interest estimates (GXBank, RYT).
+- **Emergency fund**: months of spending covered, a goal, and when you'll reach it at your pace.
+- **Where it changed**: balance changes by account, the **untracked cash** check (growth vs. what the budget says you saved) and **savings rate by month**.
+
+### 🔐 Data & privacy
+- **Email + password sign-in**, no public sign-up; every table locked with owner-only **Row-Level Security**.
+- **Guest mode** with generated demo data, isolated from the database.
+- **Export**: month or all expenses as Excel-friendly CSV, savings balances, or a full JSON backup.
+- Refined dark theme with a light mode, and layouts that adapt to touch and mouse.
 
 ---
 
@@ -47,10 +67,11 @@ Guest mode never touches the database and stores nothing in your browser, so **n
 
 - **Frontend & App Framework**: [Next.js 15 (App Router)](https://nextjs.org/) + [React 19](https://react.dev/)
 - **Styling & UI**: [Tailwind CSS](https://tailwindcss.com/) + [Lucide Icons](https://lucide.dev/) + Inter font
-- **Charts & Visualizations**: [Recharts](https://recharts.org/) (daily spend chart) + ranked category and tag bar lists
-- **Database & Authentication**: [Supabase (PostgreSQL 16)](https://supabase.com/) with Row-Level Security (RLS)
-- **PWA Integration**: Mobile Web App Manifest (`public/manifest.json`)
-- **Hosting**: [Vercel](https://vercel.com/) (Serverless Edge, 100% Free Hobby Tier)
+- **Charts & Visualizations**: [Recharts](https://recharts.org/) plus custom accessible bar lists and a calendar heatmap
+- **Database & Authentication**: [Supabase (PostgreSQL)](https://supabase.com/) with Row-Level Security (RLS) and `pg_cron`
+- **PWA Integration**: Web App Manifest and home-screen icons
+- **Quality**: TypeScript, ESLint, formula parity tests, GitHub Actions CI
+- **Hosting**: [Vercel](https://vercel.com/) (free Hobby tier)
 
 ---
 
@@ -73,7 +94,7 @@ Guest mode never touches the database and stores nothing in your browser, so **n
 │                  DATABASE TIER (SUPABASE)                   │
 │  • PostgreSQL 16 Relational Engine                          │
 │  • Row-Level Security (RLS) Policies                        │
-│  • Automated Cloud Backups                                  │
+│  • pg_cron: daily auto-add of due monthly bills             │
 └─────────────────────────────────────────────────────────────┘
 ```
 

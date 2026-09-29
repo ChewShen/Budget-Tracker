@@ -34,7 +34,7 @@ When one is picked up, move it to `docs/changelog.md` under the version that shi
 
 ## Data housekeeping
 
-- **Keep real data out of git**: `*.xlsm`, `*.xlsx`, `scripts/seed_data.sql` and `private/` are gitignored. The public repository is published from a scrubbed copy of the history; re-run the same scrub before each publish.
+- **Keep real data out of git**: `*.xlsm`, `*.xlsx`, `scripts/seed_data.sql` and `private/` are gitignored, and local git hooks (pre-commit, commit-msg, pre-push, using a gitignored list in `private/guard/`) block commits and pushes containing real personal data. Hooks live only in `.git/hooks`: when cloning elsewhere, copy `private/` and reinstall them. The earlier private repository (with the original, unscrubbed history) is archived and no longer used.
 
 - Check August 2026 balances from the Excel import (Main checking RM 0, EPF RM 10 look wrong).
 - Optionally delete the all-zero savings rows the import created for Sep–Dec 2026 (the app already treats them as "not recorded").
