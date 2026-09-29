@@ -48,7 +48,7 @@ function ShellInner({ children }: { children: React.ReactNode }) {
 
   return (
     <QuickAddContext.Provider value={{ openEdit }}>
-      <div className="min-h-screen bg-background text-foreground pb-28 md:pb-12 flex flex-col">
+      <div className="min-h-screen bg-background text-foreground pb-[calc(7rem+env(safe-area-inset-bottom))] md:pb-12 flex flex-col">
         <Navbar onOpenQuickAdd={openQuickAdd} />
         {mode === "guest" && <GuestBanner />}
 
@@ -102,7 +102,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // The login page renders bare: no nav, and no data provider (it would only fetch empty results).
   if (pathname === "/login") {
     return (
-      <main className="mx-auto w-full max-w-6xl px-4 sm:px-6">{children}</main>
+      <main className="mx-auto w-full max-w-6xl px-4 pt-safe sm:px-6">{children}</main>
     );
   }
 
