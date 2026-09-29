@@ -4,6 +4,18 @@ A full-stack, mobile-first personal finance application built to replace traditi
 
 Hosted $100\%$ free on **Vercel** and **Supabase (PostgreSQL)** with no expiring trial periods or server costs.
 
+## 👀 Try It Without an Account
+
+**Live app: [budget-tracker-gold-sigma.vercel.app](https://budget-tracker-gold-sigma.vercel.app)**
+
+On the sign-in page, choose **Continue without an account**. You get the full app with made-up sample data:
+
+- Add, edit and delete expenses, set up monthly bills, categories and savings balances
+- Explore the analytics: month-end forecast, insights, spending calendar, savings rate and emergency fund
+- Works on your phone too, and can be added to the home screen
+
+Guest mode never touches the database and stores nothing in your browser, so **nothing you enter is saved**: a refresh starts over.
+
 ---
 
 ## 📱 Highlights & Features
