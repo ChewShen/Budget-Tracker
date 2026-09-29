@@ -15,6 +15,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.13.0] - 2026-09-29
+
+### Added
+- **Goals**: A new Goals page for things you're saving for, with progress, the monthly amount needed to hit a target date (on track / behind), or when you'll be ready at your pace.
+- **Trade-in value** on a goal comes off what you need to save, and shows when the value was last checked.
+- **Discounts & vouchers** on a goal (RM or %, with optional expiry): expiring vouchers are flagged; expired ones stop counting.
+- **Set aside or take back money** for a goal, with history; reorder goals by priority.
+- **Bought it**: logs what you paid as a one-off expense and moves the goal to Completed.
+- The Savings page separates money set aside for goals from free money; the emergency fund counts only free money.
+- README screenshots and an up-to-date feature list.
+
+### Changed
+- The full JSON backup includes goals and their history.
+
+### Database
+- New migration `scripts/migrations/2026-09-29_goals.sql` (run once in Supabase; safe to re-run): `goals` and `goal_contributions` tables with owner-only access, and a `discounts` column on goals.
+
+---
+
 ## [0.12.0] - 2026-09-29
 
 ### Added
