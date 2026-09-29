@@ -167,7 +167,7 @@ function BillForm({
   );
 }
 
-export function BillsManager() {
+export function BillsManager({ showTitle = true }: { showTitle?: boolean }) {
   const { bills, tags, categories } = useBudget();
   const [editing, setEditing] = useState<string | "new" | null>(null);
 
@@ -183,8 +183,8 @@ export function BillsManager() {
     <section className="card p-5 sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h3 className="text-[15px] font-semibold">Monthly bills</h3>
-          <p className="mt-0.5 text-xs text-muted-foreground">
+          {showTitle && <h3 className="text-[15px] font-semibold">Monthly bills</h3>}
+          <p className={showTitle ? "mt-0.5 text-xs text-muted-foreground" : "text-sm text-muted-foreground"}>
             Tags you pay every month. Overview shows which are still unpaid.
           </p>
         </div>

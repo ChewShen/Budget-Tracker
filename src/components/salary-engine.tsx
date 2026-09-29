@@ -17,7 +17,7 @@ interface SalaryEngineProps {
   onSaveProfile: (profile: UserSalaryProfile) => Promise<void>;
 }
 
-function SalaryForm({
+export function SalaryForm({
   profile,
   onSave,
   onCancel,

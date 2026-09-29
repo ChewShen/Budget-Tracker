@@ -187,7 +187,7 @@ function TagInput({
   );
 }
 
-export function CategoryManager() {
+export function CategoryManager({ showTitle = true }: { showTitle?: boolean }) {
   const { categories, tags, transactions, addCategory, renameCategory, deleteCategory, addTag, renameTag, deleteTag } =
     useBudget();
   const [editor, setEditor] = useState<Editor>({ kind: "none" });
@@ -199,8 +199,8 @@ export function CategoryManager() {
     <section className="card p-5 sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h3 className="text-[15px] font-semibold">Categories & tags</h3>
-          <p className="mt-0.5 text-xs text-muted-foreground">
+          {showTitle && <h3 className="text-[15px] font-semibold">Categories & tags</h3>}
+          <p className={showTitle ? "mt-0.5 text-xs text-muted-foreground" : "text-sm text-muted-foreground"}>
             Tap a category or tag to rename it. Anything in use by expenses can&apos;t be deleted.
           </p>
         </div>
