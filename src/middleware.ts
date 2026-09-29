@@ -48,6 +48,6 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // Skip Next internals and public static files (manifest, icons).
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.json|.*\\.(?:png|svg|ico|webp)$).*)"],
+  // Skip Next internals and public static files (manifest, service worker, icons).
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.json|sw.js|.*\\.(?:png|svg|ico|webp)$).*)"],
 };

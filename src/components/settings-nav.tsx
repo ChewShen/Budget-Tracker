@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronRight, Gauge, Receipt, SlidersHorizontal, Tags, UserRound, Wallet, type LucideIcon } from "lucide-react";
+import { Bell, ChevronRight, Gauge, Receipt, SlidersHorizontal, Tags, UserRound, Wallet, type LucideIcon } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
 import { useBudget } from "@/lib/budget-context";
 
@@ -18,6 +18,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   { href: "/settings/salary", label: "Salary & deductions", icon: Wallet },
   { href: "/settings/budgets", label: "Budgets", icon: Gauge },
   { href: "/settings/bills", label: "Monthly bills", icon: Receipt },
+  { href: "/settings/reminders", label: "Reminders", icon: Bell },
   { href: "/settings/categories", label: "Categories & tags", icon: Tags },
   { href: "/settings/account", label: "Account", icon: UserRound },
 ];
@@ -37,6 +38,7 @@ function useSummaries(email: string | null): Record<string, string> {
     "/settings/bills": bills.length
       ? `${plural(bills.length, "bill")}${autoBills ? ` · ${autoBills} automatic` : ""}`
       : "None yet",
+    "/settings/reminders": mode === "cloud" ? "Bills, vouchers, budgets" : "Needs an account",
     "/settings/categories": `${plural(categories.length, "category", "categories")} · ${plural(tags.length, "tag")}`,
     "/settings/account":
       mode === "guest" ? "Guest · nothing is saved" : mode === "local" ? "Saved on this device" : email || "Signed in",

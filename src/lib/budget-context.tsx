@@ -13,6 +13,7 @@ import {
   INITIAL_GOAL_CONTRIBUTIONS,
   INITIAL_BUDGETS,
 } from "./mock-data";
+import { disablePush } from "./push";
 import { createClient } from "./supabase/client";
 import { isSupabaseConfigured } from "./supabase/config";
 import { exitGuest, isGuestSession } from "./guest";
@@ -975,6 +976,8 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     if (mode === "guest") return exitGuest();
     if (!isCloud) return;
+    // Signed-out devices shouldn't keep getting this account's reminders.
+    await disablePush().catch(() => {});
     await createClient().auth.signOut();
     window.location.replace("/login");
   };
