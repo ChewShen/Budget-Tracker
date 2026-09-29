@@ -8,7 +8,8 @@ import { recordedHistory } from "@/lib/savings";
 import { CSV, JSON_TYPE, backupJson, download, savingsCsv, transactionsCsv } from "@/lib/export";
 
 export function ExportMenu() {
-  const { transactions, savings, categories, tags, bills, profile, selectedMonth, showToast } = useBudget();
+  const { transactions, savings, categories, tags, bills, goals, goalContributions, profile, selectedMonth, showToast } =
+    useBudget();
   const [isOpen, setIsOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -63,13 +64,13 @@ export function ExportMenu() {
     },
     {
       label: "Full backup",
-      detail: "Everything, incl. categories, bills and salary · JSON",
+      detail: "Everything, incl. categories, bills, goals and salary · JSON",
       icon: FileJson,
       disabled: false,
       run: () => {
         download(
           `budget_backup_${today}.json`,
-          backupJson({ profile, categories, tags, bills, transactions, savings }),
+          backupJson({ profile, categories, tags, bills, goals, goalContributions, transactions, savings }),
           JSON_TYPE
         );
         return "Backup downloaded";

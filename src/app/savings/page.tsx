@@ -8,6 +8,8 @@ import { useBudget } from "@/lib/budget-context";
 import { MonthSelector } from "@/components/month-selector";
 import { BalancesSheet } from "@/components/balances-sheet";
 import { EmergencyFundCard } from "@/components/emergency-fund";
+import Link from "next/link";
+import { earmarkedTotal } from "@/lib/goals";
 import { AccountChanges } from "@/components/account-changes";
 import { SavingsRateTrend } from "@/components/savings-rate-trend";
 import { formatCurrency } from "@/lib/utils";
@@ -65,6 +67,8 @@ export default function SavingsPage() {
     showToast,
     emergencyMonths,
     setEmergencyMonths,
+    goals,
+    goalContributions,
   } = useBudget();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
 
@@ -87,8 +91,12 @@ export default function SavingsPage() {
   // Emergency fund: liquid money vs average spending of completed months.
   const spend = averageMonthlySpend(transactions, selectedMonth, format(new Date(), "yyyy-MM"));
   const pace = savingPace(savings, selectedMonth, netSalary, spend.average);
+  // Money set aside for goals is today's figure, so it only applies to the latest recorded balances.
+  const isLatestRecord = Boolean(current) && recordedHistory(savings).at(-1)?.month === current?.month;
+  const earmarked = isLatestRecord ? earmarkedTotal(goals, goalContributions) : 0;
+  const freeLiquid = current ? Math.max(0, liquidOf(current) - earmarked) : 0;
   const emergencyTarget = emergencyMonths * spend.average;
-  const reachBy = current ? reachMonth(selectedMonth, emergencyTarget - liquidOf(current), pace.perMonth) : null;
+  const reachBy = current ? reachMonth(selectedMonth, emergencyTarget - freeLiquid, pace.perMonth) : null;
 
   const growth = current && prevAdjacent ? liquidOf(current) - liquidOf(prevAdjacent) : null;
   const untracked =
@@ -152,6 +160,14 @@ export default function SavingsPage() {
               Update balances
             </button>
           </div>
+          {earmarked > 0 && (
+            <p className="mt-2 text-sm text-muted-foreground">
+              <Link href="/goals" className="underline decoration-border underline-offset-4 hover:text-foreground">
+                {formatCurrency(earmarked)} set aside for goals
+              </Link>{" "}
+              · <span className="tabular-nums">{formatCurrency(freeLiquid)}</span> liquid money free
+            </p>
+          )}
 
           <ul className="mt-6 divide-y divide-border/70 border-t">
             {ACCOUNT_KEYS.map(({ key, label }) => {
@@ -197,7 +213,8 @@ export default function SavingsPage() {
 
       {current && (
         <EmergencyFundCard
-          liquid={liquidOf(current)}
+          liquid={freeLiquid}
+          earmarked={earmarked}
           averageSpend={spend.average}
           spendMonths={spend.months}
           goalMonths={emergencyMonths}

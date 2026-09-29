@@ -6,7 +6,8 @@ import { formatCurrency } from "@/lib/utils";
 import type { SavingPace } from "@/lib/savings";
 
 interface EmergencyFundProps {
-  liquid: number;
+  liquid: number; // free liquid money (after money set aside for goals)
+  earmarked: number;
   averageSpend: number;
   spendMonths: string[]; // months the average is based on
   goalMonths: number;
@@ -20,6 +21,7 @@ const monthLabel = (m: string) => format(parseISO(`${m}-01`), "MMM yyyy");
 
 export function EmergencyFundCard({
   liquid,
+  earmarked,
   averageSpend,
   spendMonths,
   goalMonths,
@@ -49,7 +51,8 @@ export function EmergencyFundCard({
         <div>
           <h3 className="text-[15px] font-semibold">Emergency fund</h3>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Liquid money vs your average spending of {formatCurrency(averageSpend)}/month (
+            {earmarked > 0 ? `Liquid money not set aside for goals` : "Liquid money"} vs your average spending of{" "}
+            {formatCurrency(averageSpend)}/month (
             {spendMonths.length === 1 ? monthLabel(spendMonths[0]) : `${spendMonths.length}-month average`})
           </p>
         </div>
