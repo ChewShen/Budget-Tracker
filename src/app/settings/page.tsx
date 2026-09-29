@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { DefaultDateMode, getDefaultDateMode, setDefaultDateMode } from "@/lib/preferences";
 import { CategoryManager } from "@/components/category-manager";
+import { isGuestSession } from "@/lib/guest";
 import { BillsManager } from "@/components/bills-manager";
 
 const DATE_OPTIONS: { value: DefaultDateMode; label: string; description: string }[] = [
@@ -24,13 +25,13 @@ const DATE_OPTIONS: { value: DefaultDateMode; label: string; description: string
 ];
 
 export default function SettingsPage() {
-  const { signOut } = useBudget();
+  const { signOut, mode } = useBudget();
   const [dateMode, setDateMode] = useState<DefaultDateMode>("today");
   const [email, setEmail] = useState<string | null>(null);
 
   useEffect(() => {
     setDateMode(getDefaultDateMode());
-    if (isSupabaseConfigured) {
+    if (isSupabaseConfigured && !isGuestSession()) {
       createClient()
         .auth.getUser()
         .then(({ data }) => setEmail(data.user?.email ?? null));
@@ -91,7 +92,24 @@ export default function SettingsPage() {
 
       <CategoryManager />
 
-      {isSupabaseConfigured && (
+      {mode === "guest" && (
+        <section className="card flex flex-wrap items-center justify-between gap-3 p-5 sm:p-6">
+          <div className="min-w-0">
+            <h3 className="text-[15px] font-semibold">Account</h3>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              You&apos;re a guest. Changes here disappear when you refresh.
+            </p>
+          </div>
+          <button
+            onClick={signOut}
+            className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:brightness-95"
+          >
+            Sign in to save
+          </button>
+        </section>
+      )}
+
+      {mode === "cloud" && (
         <section className="card flex flex-wrap items-center justify-between gap-3 p-5 sm:p-6">
           <div className="min-w-0">
             <h3 className="text-[15px] font-semibold">Account</h3>

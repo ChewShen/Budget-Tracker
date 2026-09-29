@@ -7,7 +7,6 @@ import { useBudget } from "@/lib/budget-context";
 import { categoryLabel } from "@/lib/categories";
 import { formatCurrency } from "@/lib/utils";
 import { RecurringBill } from "@/lib/types";
-import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { dueDateIn } from "@/lib/bills";
 
 const DAYS = Array.from({ length: 31 }, (_, i) => i + 1);
@@ -28,7 +27,7 @@ function BillForm({
   bill?: RecurringBill; // editing when set, adding otherwise
   onDone: () => void;
 }) {
-  const { tags, categories, bills, transactions, addBill, updateBill, removeBill } = useBudget();
+  const { tags, categories, bills, transactions, addBill, updateBill, removeBill, mode } = useBudget();
   const [tagId, setTagId] = useState(bill?.tag_id ?? "");
   const [amount, setAmount] = useState(bill?.expected_amount ? String(bill.expected_amount) : "");
   const [dueDay, setDueDay] = useState(bill?.due_day ? String(bill.due_day) : "");
@@ -136,7 +135,7 @@ function BillForm({
       {pastDueUnpaid && (
         <p className="text-xs text-muted-foreground">
           This month&apos;s is already due, so it will be added{" "}
-          {isSupabaseConfigured ? "at the next daily run (just after midnight)" : "next time the app opens"}.
+          {mode === "cloud" ? "at the next daily run (just after midnight)" : "next time the app opens"}.
         </p>
       )}
       <div className="flex flex-wrap items-center justify-end gap-2">

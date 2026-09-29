@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { SUPABASE_ANON_KEY, SUPABASE_URL, isSupabaseConfigured } from "@/lib/supabase/config";
+import { GUEST_COOKIE } from "@/lib/guest";
 
 // Refreshes the Supabase session cookie and sends signed-out visitors to /login.
 // This is a convenience layer only: the data itself is protected by RLS policies
@@ -30,13 +31,18 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const isLoginPage = request.nextUrl.pathname === "/login";
+  // Guests ("Continue without an account") only ever see in-memory demo data; RLS still
+  // blocks them from the database, so letting them past this redirect exposes nothing.
+  const isGuest = request.cookies.get(GUEST_COOKIE)?.value === "1";
 
-  if (!user && !isLoginPage) {
+  if (!user && !isLoginPage && !isGuest) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
   if (user && isLoginPage) {
     return NextResponse.redirect(new URL("/", request.url));
   }
+  // Signed in for real: drop any leftover guest flag so the app loads the account's data.
+  if (user && isGuest) response.cookies.delete(GUEST_COOKIE);
 
   return response;
 }
