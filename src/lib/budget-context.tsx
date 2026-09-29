@@ -2,7 +2,7 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { format } from "date-fns";
-import { Category, Goal, GoalContribution, Tag, Transaction, MonthlySavings, RecurringBill, UserSalaryProfile } from "./types";
+import { Budget, Category, Goal, GoalContribution, Tag, Transaction, MonthlySavings, RecurringBill, UserSalaryProfile } from "./types";
 import {
   INITIAL_CATEGORIES,
   INITIAL_TAGS,
@@ -11,6 +11,7 @@ import {
   INITIAL_BILLS,
   INITIAL_GOALS,
   INITIAL_GOAL_CONTRIBUTIONS,
+  INITIAL_BUDGETS,
 } from "./mock-data";
 import { createClient } from "./supabase/client";
 import { isSupabaseConfigured } from "./supabase/config";
@@ -72,6 +73,9 @@ interface BudgetContextType {
   showToast: (toast: Omit<Toast, "id">) => void;
   dismissToast: () => void;
   bills: RecurringBill[];
+  budgets: Budget[];
+  // Set a category's monthly limit; null removes the budget.
+  setBudget: (categoryId: string, limit: number | null) => Promise<boolean>;
   goals: Goal[];
   goalContributions: GoalContribution[];
   addGoal: (goal: GoalInput) => Promise<Goal | null>;
@@ -107,6 +111,7 @@ const STORAGE_KEYS = {
   BILLS: "budget_tracker_bills",
   EMERGENCY_MONTHS: "budget_tracker_emergency_months",
   GOALS: "budget_tracker_goals",
+  BUDGETS: "budget_tracker_budgets",
   GOAL_CONTRIBUTIONS: "budget_tracker_goal_contributions",
 };
 
@@ -139,6 +144,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<UserSalaryProfile>(DEFAULT_PROFILE);
   const [emergencyMonths, setEmergencyMonthsState] = useState(6);
   const [bills, setBills] = useState<RecurringBill[]>(isSupabaseConfigured ? [] : INITIAL_BILLS);
+  const [budgets, setBudgets] = useState<Budget[]>(isSupabaseConfigured ? [] : INITIAL_BUDGETS);
   const [goals, setGoals] = useState<Goal[]>(isSupabaseConfigured ? [] : INITIAL_GOALS);
   const [goalContributions, setGoalContributions] = useState<GoalContribution[]>(
     isSupabaseConfigured ? [] : INITIAL_GOAL_CONTRIBUTIONS
@@ -172,6 +178,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
       setBills(INITIAL_BILLS);
       setGoals(INITIAL_GOALS);
       setGoalContributions(INITIAL_GOAL_CONTRIBUTIONS);
+      setBudgets(INITIAL_BUDGETS);
       setIsLoaded(true);
       return;
     }
@@ -187,6 +194,8 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
         if (savedCats) setCategories(JSON.parse(savedCats));
         const savedTags = localStorage.getItem(STORAGE_KEYS.TAGS);
         if (savedTags) setTags(JSON.parse(savedTags));
+        const savedBudgets = localStorage.getItem(STORAGE_KEYS.BUDGETS);
+        if (savedBudgets) setBudgets(JSON.parse(savedBudgets));
         const savedGoals = localStorage.getItem(STORAGE_KEYS.GOALS);
         if (savedGoals) setGoals(JSON.parse(savedGoals));
         const savedContribs = localStorage.getItem(STORAGE_KEYS.GOAL_CONTRIBUTIONS);
@@ -228,7 +237,8 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
       supabase.from("recurring_sentinel").select("*"),
       supabase.from("goals").select("*").order("priority"),
       supabase.from("goal_contributions").select("*").order("date"),
-    ]).then(([cats, tgs, txs, svs, prof, bls, gls, gcs]) => {
+      supabase.from("budgets").select("id, category_id, monthly_limit"),
+    ]).then(([cats, tgs, txs, svs, prof, bls, gls, gcs, bgs]) => {
       const error = cats.error || tgs.error || txs.error || svs.error;
       if (error) {
         console.error("Supabase load error:", error);
@@ -266,6 +276,9 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
         }))
       );
       setGoalContributions((gcs.data || []).map((c: any) => ({ ...c, amount: Number(c.amount) })));
+      // Budgets are optional too (table added by the budgets migration).
+      if (bgs.error) console.error("Supabase budgets load error:", bgs.error);
+      setBudgets((bgs.data || []).map((b: any) => ({ ...b, monthly_limit: Number(b.monthly_limit) })));
       setBills(
         (bls.data || []).map((b: any) => ({
           id: b.id,
@@ -325,11 +338,12 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem(STORAGE_KEYS.TAGS, JSON.stringify(tags));
       localStorage.setItem(STORAGE_KEYS.BILLS, JSON.stringify(bills));
       localStorage.setItem(STORAGE_KEYS.GOALS, JSON.stringify(goals));
+      localStorage.setItem(STORAGE_KEYS.BUDGETS, JSON.stringify(budgets));
       localStorage.setItem(STORAGE_KEYS.GOAL_CONTRIBUTIONS, JSON.stringify(goalContributions));
     } catch (e) {
       console.error("Failed to save to localStorage", e);
     }
-  }, [transactions, savings, profile, categories, tags, bills, goals, goalContributions, isLoaded, mode]);
+  }, [transactions, savings, profile, categories, tags, bills, goals, goalContributions, budgets, isLoaded, mode]);
 
   const addTransaction = async (txInput: NewTransaction) => {
     const cat = categories.find((c) => c.id === txInput.category_id);
@@ -631,6 +645,35 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
     return true;
   };
 
+  // ---- Budgets ----
+  const setBudget = async (categoryId: string, limit: number | null) => {
+    if (isCloud) {
+      const supabase = createClient();
+      const { error } =
+        limit === null
+          ? await supabase.from("budgets").delete().eq("category_id", categoryId)
+          : await supabase
+              .from("budgets")
+              .upsert({ category_id: categoryId, monthly_limit: limit }, { onConflict: "user_id,category_id" });
+      if (error) {
+        console.error("Supabase budget error:", error);
+        showToast({
+          tone: "error",
+          message:
+            error.code === "42P01" || error.code === "PGRST205"
+              ? "Run scripts/migrations/2026-09-29_budgets.sql in Supabase first."
+              : "Couldn't save the budget.",
+        });
+        return false;
+      }
+    }
+    setBudgets((prev) => {
+      const rest = prev.filter((b) => b.category_id !== categoryId);
+      return limit === null ? rest : [...rest, { id: `budget-${categoryId}`, category_id: categoryId, monthly_limit: limit }];
+    });
+    return true;
+  };
+
   // ---- Goals ----
   const goalError = (error: { code?: string }, what: string) =>
     error.code === "42P01" || error.code === "PGRST205" || error.code === "PGRST204"
@@ -818,6 +861,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
     }
     setCategories((prev) => prev.filter((c) => c.id !== id));
     setTags((prev) => prev.filter((t) => t.category_id !== id));
+    setBudgets((prev) => prev.filter((b) => b.category_id !== id));
     showToast({ tone: "default", message: `Deleted category ${current.name}` });
     return true;
   };
@@ -957,6 +1001,8 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
         showToast,
         dismissToast,
         bills,
+        budgets,
+        setBudget,
         goals,
         goalContributions,
         addGoal,

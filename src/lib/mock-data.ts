@@ -1,4 +1,4 @@
-import { Category, Goal, GoalContribution, MonthlySavings, RecurringBill, Tag, Transaction } from "./types";
+import { Budget, Category, Goal, GoalContribution, MonthlySavings, RecurringBill, Tag, Transaction } from "./types";
 
 // Made-up demo data for guest mode and local-only mode (no Supabase).
 // Generated from today's date (last two full months + this month so far) with a fixed seed,
@@ -51,6 +51,21 @@ export const INITIAL_BILLS: RecurringBill[] = BILLS.map(([name, amount, due, aut
   due_day: due,
   auto_log: auto,
 }));
+
+// ---- Monthly budgets (a mix that ends up under, close to, and over) ----
+
+const BUDGETS: [string, number][] = [
+  ["Food", 1000],
+  ["Transport", 450],
+  ["Home_Bills", 350],
+  ["Entertainment", 60],
+  ["Subscription", 80],
+];
+
+export const INITIAL_BUDGETS: Budget[] = BUDGETS.map(([name, limit]) => {
+  const category = INITIAL_CATEGORIES.find((c) => c.name === name) as Category;
+  return { id: `budget-${category.id}`, category_id: category.id, monthly_limit: limit };
+});
 
 // ---- Transactions ----
 
