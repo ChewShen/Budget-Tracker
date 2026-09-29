@@ -2,13 +2,15 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { format } from "date-fns";
-import { Category, Tag, Transaction, MonthlySavings, RecurringBill, UserSalaryProfile } from "./types";
+import { Category, Goal, GoalContribution, Tag, Transaction, MonthlySavings, RecurringBill, UserSalaryProfile } from "./types";
 import {
   INITIAL_CATEGORIES,
   INITIAL_TAGS,
   INITIAL_TRANSACTIONS,
   INITIAL_SAVINGS,
   INITIAL_BILLS,
+  INITIAL_GOALS,
+  INITIAL_GOAL_CONTRIBUTIONS,
 } from "./mock-data";
 import { createClient } from "./supabase/client";
 import { isSupabaseConfigured } from "./supabase/config";
@@ -23,6 +25,11 @@ export type NewTransaction = {
   description?: string;
   is_one_off: boolean;
 };
+
+export type GoalInput = Pick<
+  Goal,
+  "name" | "target_amount" | "trade_in_name" | "trade_in_value" | "trade_in_updated" | "target_date" | "link" | "discounts"
+>;
 
 export type BillChanges = Partial<Pick<RecurringBill, "expected_amount" | "due_day" | "is_active" | "auto_log">>;
 
@@ -65,6 +72,15 @@ interface BudgetContextType {
   showToast: (toast: Omit<Toast, "id">) => void;
   dismissToast: () => void;
   bills: RecurringBill[];
+  goals: Goal[];
+  goalContributions: GoalContribution[];
+  addGoal: (goal: GoalInput) => Promise<Goal | null>;
+  updateGoal: (id: string, changes: Partial<GoalInput & Pick<Goal, "status" | "bought_at" | "priority">>) => Promise<boolean>;
+  deleteGoal: (id: string) => Promise<boolean>;
+  moveGoal: (id: string, direction: -1 | 1) => Promise<void>;
+  addContribution: (goalId: string, amount: number, note?: string) => Promise<boolean>;
+  deleteContribution: (id: string) => Promise<boolean>;
+  markGoalBought: (goalId: string, expense: NewTransaction) => Promise<boolean>;
   addBill: (tagId: string, changes?: BillChanges) => Promise<boolean>;
   updateBill: (id: string, changes: BillChanges) => Promise<boolean>;
   removeBill: (id: string) => Promise<boolean>;
@@ -90,6 +106,8 @@ const STORAGE_KEYS = {
   TAGS: "budget_tracker_tags",
   BILLS: "budget_tracker_bills",
   EMERGENCY_MONTHS: "budget_tracker_emergency_months",
+  GOALS: "budget_tracker_goals",
+  GOAL_CONTRIBUTIONS: "budget_tracker_goal_contributions",
 };
 
 // Turns a Supabase/Postgres error into a message the user can act on.
@@ -121,6 +139,10 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<UserSalaryProfile>(DEFAULT_PROFILE);
   const [emergencyMonths, setEmergencyMonthsState] = useState(6);
   const [bills, setBills] = useState<RecurringBill[]>(isSupabaseConfigured ? [] : INITIAL_BILLS);
+  const [goals, setGoals] = useState<Goal[]>(isSupabaseConfigured ? [] : INITIAL_GOALS);
+  const [goalContributions, setGoalContributions] = useState<GoalContribution[]>(
+    isSupabaseConfigured ? [] : INITIAL_GOAL_CONTRIBUTIONS
+  );
   const [mode, setMode] = useState<DataMode>(isSupabaseConfigured ? "cloud" : "local");
   const isCloud = mode === "cloud";
   const [toast, setToast] = useState<Toast | null>(null);
@@ -148,6 +170,8 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
       setTransactions(INITIAL_TRANSACTIONS);
       setSavings(INITIAL_SAVINGS);
       setBills(INITIAL_BILLS);
+      setGoals(INITIAL_GOALS);
+      setGoalContributions(INITIAL_GOAL_CONTRIBUTIONS);
       setIsLoaded(true);
       return;
     }
@@ -163,6 +187,10 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
         if (savedCats) setCategories(JSON.parse(savedCats));
         const savedTags = localStorage.getItem(STORAGE_KEYS.TAGS);
         if (savedTags) setTags(JSON.parse(savedTags));
+        const savedGoals = localStorage.getItem(STORAGE_KEYS.GOALS);
+        if (savedGoals) setGoals(JSON.parse(savedGoals));
+        const savedContribs = localStorage.getItem(STORAGE_KEYS.GOAL_CONTRIBUTIONS);
+        if (savedContribs) setGoalContributions(JSON.parse(savedContribs));
         const savedBills = localStorage.getItem(STORAGE_KEYS.BILLS);
         if (savedBills) setBills(JSON.parse(savedBills));
         const savedGoal = Number(localStorage.getItem(STORAGE_KEYS.EMERGENCY_MONTHS));
@@ -198,7 +226,9 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
         .select("*")
         .maybeSingle(),
       supabase.from("recurring_sentinel").select("*"),
-    ]).then(([cats, tgs, txs, svs, prof, bls]) => {
+      supabase.from("goals").select("*").order("priority"),
+      supabase.from("goal_contributions").select("*").order("date"),
+    ]).then(([cats, tgs, txs, svs, prof, bls, gls, gcs]) => {
       const error = cats.error || tgs.error || txs.error || svs.error;
       if (error) {
         console.error("Supabase load error:", error);
@@ -225,6 +255,17 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
       setSavings(svs.data || []);
       // Bills are optional: before the monthly-bills migration some columns are missing, but rows still load.
       if (bls.error) console.error("Supabase bills load error:", bls.error);
+      // Goals are optional: before the goals migration the tables don't exist; everything else still loads.
+      if (gls.error || gcs.error) console.error("Supabase goals load error:", gls.error || gcs.error);
+      setGoals(
+        (gls.data || []).map((g: any) => ({
+          ...g,
+          target_amount: Number(g.target_amount),
+          trade_in_value: Number(g.trade_in_value || 0),
+          discounts: Array.isArray(g.discounts) ? g.discounts : [],
+        }))
+      );
+      setGoalContributions((gcs.data || []).map((c: any) => ({ ...c, amount: Number(c.amount) })));
       setBills(
         (bls.data || []).map((b: any) => ({
           id: b.id,
@@ -283,10 +324,12 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(categories));
       localStorage.setItem(STORAGE_KEYS.TAGS, JSON.stringify(tags));
       localStorage.setItem(STORAGE_KEYS.BILLS, JSON.stringify(bills));
+      localStorage.setItem(STORAGE_KEYS.GOALS, JSON.stringify(goals));
+      localStorage.setItem(STORAGE_KEYS.GOAL_CONTRIBUTIONS, JSON.stringify(goalContributions));
     } catch (e) {
       console.error("Failed to save to localStorage", e);
     }
-  }, [transactions, savings, profile, categories, tags, bills, isLoaded, mode]);
+  }, [transactions, savings, profile, categories, tags, bills, goals, goalContributions, isLoaded, mode]);
 
   const addTransaction = async (txInput: NewTransaction) => {
     const cat = categories.find((c) => c.id === txInput.category_id);
@@ -588,6 +631,119 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
     return true;
   };
 
+  // ---- Goals ----
+  const goalError = (error: { code?: string }, what: string) =>
+    error.code === "42P01" || error.code === "PGRST205" || error.code === "PGRST204"
+      ? "Run scripts/migrations/2026-09-29_goals.sql in Supabase first."
+      : `Couldn't save ${what}.`;
+  const toGoal = (g: any): Goal => ({
+    ...g,
+    target_amount: Number(g.target_amount),
+    trade_in_value: Number(g.trade_in_value || 0),
+    discounts: Array.isArray(g.discounts) ? g.discounts : [],
+  });
+
+  const addGoal = async (input: GoalInput) => {
+    const priority = goals.filter((g) => g.status === "active").reduce((max, g) => Math.max(max, g.priority + 1), 0);
+    let created: Goal = { id: `goal-${Date.now()}`, ...input, priority, status: "active" };
+    if (isCloud) {
+      const { data, error } = await createClient()
+        .from("goals")
+        .insert({ ...input, priority, status: "active" })
+        .select()
+        .single();
+      if (error || !data) {
+        console.error("Supabase goal insert error:", error);
+        showToast({ tone: "error", message: goalError(error || {}, "the goal") });
+        return null;
+      }
+      created = toGoal(data);
+    }
+    setGoals((prev) => [...prev, created]);
+    return created;
+  };
+
+  const updateGoal: BudgetContextType["updateGoal"] = async (id, changes) => {
+    if (isCloud) {
+      const { error } = await createClient().from("goals").update(changes).eq("id", id);
+      if (error) {
+        console.error("Supabase goal update error:", error);
+        showToast({ tone: "error", message: goalError(error, "the goal") });
+        return false;
+      }
+    }
+    setGoals((prev) => prev.map((g) => (g.id === id ? { ...g, ...changes } : g)));
+    return true;
+  };
+
+  const deleteGoal = async (id: string) => {
+    if (isCloud) {
+      // Contributions cascade with the goal.
+      const { error } = await createClient().from("goals").delete().eq("id", id);
+      if (error) {
+        console.error("Supabase goal delete error:", error);
+        showToast({ tone: "error", message: goalError(error, "the goal") });
+        return false;
+      }
+    }
+    setGoals((prev) => prev.filter((g) => g.id !== id));
+    setGoalContributions((prev) => prev.filter((c) => c.goal_id !== id));
+    return true;
+  };
+
+  // Move a goal up/down: renumber the active list 0..n-1 with the swap applied, saving only goals that moved.
+  const moveGoal = async (id: string, direction: -1 | 1) => {
+    const ordered = goals.filter((g) => g.status === "active").sort((a, b) => a.priority - b.priority);
+    const i = ordered.findIndex((g) => g.id === id);
+    const j = i + direction;
+    if (i < 0 || j < 0 || j >= ordered.length) return;
+    [ordered[i], ordered[j]] = [ordered[j], ordered[i]];
+    for (const [position, goal] of ordered.entries()) {
+      if (goal.priority !== position && !(await updateGoal(goal.id, { priority: position }))) return;
+    }
+  };
+
+  const addContribution = async (goalId: string, amount: number, note?: string) => {
+    const date = format(new Date(), "yyyy-MM-dd");
+    let created: GoalContribution = { id: `gc-${Date.now()}`, goal_id: goalId, amount, date, note: note || null };
+    if (isCloud) {
+      const { data, error } = await createClient()
+        .from("goal_contributions")
+        .insert({ goal_id: goalId, amount, date, note: note || null })
+        .select()
+        .single();
+      if (error || !data) {
+        console.error("Supabase contribution insert error:", error);
+        showToast({ tone: "error", message: goalError(error || {}, "the amount") });
+        return false;
+      }
+      created = { ...data, amount: Number(data.amount) };
+    }
+    setGoalContributions((prev) => [...prev, created]);
+    return true;
+  };
+
+  const deleteContribution = async (id: string) => {
+    if (isCloud) {
+      const { error } = await createClient().from("goal_contributions").delete().eq("id", id);
+      if (error) {
+        console.error("Supabase contribution delete error:", error);
+        showToast({ tone: "error", message: goalError(error, "the change") });
+        return false;
+      }
+    }
+    setGoalContributions((prev) => prev.filter((c) => c.id !== id));
+    return true;
+  };
+
+  // Log what was actually paid as a one-off expense, then mark the goal bought.
+  const markGoalBought = async (goalId: string, expense: NewTransaction) => {
+    const ok = await updateGoal(goalId, { status: "bought", bought_at: expense.date });
+    if (!ok) return false;
+    await addTransaction({ ...expense, is_one_off: true });
+    return true;
+  };
+
   // ---- Categories & tags ----
   // Creation waits for the database (the new id is needed right away); edits are applied after success.
   const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name);
@@ -801,6 +957,15 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
         showToast,
         dismissToast,
         bills,
+        goals,
+        goalContributions,
+        addGoal,
+        updateGoal,
+        deleteGoal,
+        moveGoal,
+        addContribution,
+        deleteContribution,
+        markGoalBought,
         addBill,
         updateBill,
         removeBill,

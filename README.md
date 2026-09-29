@@ -55,6 +55,11 @@ Guest mode never touches the database and stores nothing in your browser, so **n
 - **Emergency fund**: months of spending covered, a goal, and when you'll reach it at your pace.
 - **Where it changed**: balance changes by account, the **untracked cash** check (growth vs. what the budget says you saved) and **savings rate by month**.
 
+### 🎯 Goals
+- Save toward things you want: progress, "set aside RM X/month to make it by <date>" with **on track / behind**, or when you'll be ready at your pace.
+- **Trade-in value** and **discounts & vouchers** (RM or %, with expiry dates) come off the target; expiring vouchers are flagged, expired ones stop counting.
+- **Bought it** logs what you paid as a one-off expense; money set aside for goals is kept separate from your emergency fund.
+
 ### 🔐 Data & privacy
 - **Email + password sign-in**, no public sign-up; every table locked with owner-only **Row-Level Security**.
 - **Guest mode** with generated demo data, isolated from the database.
@@ -213,6 +218,7 @@ One-off SQL changes for existing databases live in [`scripts/migrations/`](scrip
 - `2026-09-28_monthly_bills.sql`: adds expected amount and due day to `recurring_sentinel`, one row per bill, and carries over the 8 bills the app used to hard-code.
 - `2026-09-28_auto_bills.sql`: per-bill "Add automatically" switch and a daily `pg_cron` job (00:05 Malaysia time) that adds due auto bills. Needs the `pg_cron` extension (Dashboard → Database → Extensions).
 - `2026-09-28_emergency_goal.sql`: adds `user_profiles.emergency_months` (emergency fund goal on the Savings page, default 6).
+- `2026-09-29_goals.sql`: `goals` (targets with optional trade-in and discounts) and `goal_contributions` (money set aside) tables, owner-only RLS. Re-runnable: running it again adds anything new.
 
 ---
 

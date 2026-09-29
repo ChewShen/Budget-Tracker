@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { House, ListOrdered, PiggyBank, Plus } from "lucide-react";
+import { House, ListOrdered, PiggyBank, Plus, Target } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface BottomNavProps {
@@ -13,6 +13,7 @@ const LINKS = [
   { href: "/", label: "Overview", icon: House },
   { href: "/transactions", label: "Activity", icon: ListOrdered },
   { href: "/savings", label: "Savings", icon: PiggyBank },
+  { href: "/goals", label: "Goals", icon: Target },
 ];
 
 export function BottomNav({ onOpenQuickAdd }: BottomNavProps) {

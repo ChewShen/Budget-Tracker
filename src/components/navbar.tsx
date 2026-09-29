@@ -14,6 +14,7 @@ const LINKS = [
   { href: "/", label: "Overview" },
   { href: "/transactions", label: "Transactions" },
   { href: "/savings", label: "Savings" },
+  { href: "/goals", label: "Goals" },
 ];
 
 export function Navbar({ onOpenQuickAdd }: NavbarProps) {

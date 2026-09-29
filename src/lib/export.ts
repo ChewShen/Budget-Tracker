@@ -1,7 +1,16 @@
 import { format, parseISO } from "date-fns";
 import { categoryLabel } from "./categories";
 import { liquidOf, netWorthOf, recordedHistory } from "./savings";
-import type { Category, MonthlySavings, RecurringBill, Tag, Transaction, UserSalaryProfile } from "./types";
+import type {
+  Category,
+  Goal,
+  GoalContribution,
+  MonthlySavings,
+  RecurringBill,
+  Tag,
+  Transaction,
+  UserSalaryProfile,
+} from "./types";
 
 // ---- CSV ----
 
@@ -72,6 +81,8 @@ export function backupJson(data: {
   categories: Category[];
   tags: Tag[];
   bills: RecurringBill[];
+  goals: Goal[];
+  goalContributions: GoalContribution[];
   transactions: Transaction[];
   savings: MonthlySavings[];
 }): string {
