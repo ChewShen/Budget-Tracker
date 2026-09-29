@@ -15,6 +15,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.13.1] - 2026-09-29
+
+### Fixed
+- **iPhone home-screen app**: the top bar (settings, theme, add) sat under the status bar and Dynamic Island and couldn't be tapped. The app now starts below the status bar (readable in light mode too), and safe areas are respected at the top, bottom and sides. Remove and re-add the app to the home screen to pick this up.
+- On iPhones with a home bar, the Undo/Retry message no longer overlaps the bottom navigation, and page ends aren't hidden behind it.
+
+### Changed
+- **Settings is split into sections** (General, Salary & deductions, Monthly bills, Categories & tags, Account) with a live summary for each: a list on phones, a sidebar on desktop.
+- Theme can be chosen in Settings → General, and salary edited in Settings → Salary & deductions.
+
+---
+
 ## [0.13.0] - 2026-09-29
 
 ### Added

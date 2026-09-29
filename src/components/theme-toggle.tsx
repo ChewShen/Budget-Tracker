@@ -1,27 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { Moon, Sun } from "lucide-react";
+import { setTheme, useTheme } from "@/lib/theme";
 
 export function ThemeToggle() {
-  const [isLight, setIsLight] = useState(false);
-
-  useEffect(() => {
-    setIsLight(document.documentElement.dataset.theme === "light");
-  }, []);
-
-  const toggle = () => {
-    const next = !isLight;
-    setIsLight(next);
-    const root = document.documentElement;
-    if (next) root.dataset.theme = "light";
-    else delete root.dataset.theme;
-    try {
-      localStorage.setItem("theme", next ? "light" : "dark");
-    } catch {
-      // Storage unavailable (private mode); theme still applies for this session.
-    }
-  };
+  const isLight = useTheme() === "light";
+  const toggle = () => setTheme(isLight ? "dark" : "light");
 
   return (
     <button
