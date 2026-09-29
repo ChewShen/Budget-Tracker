@@ -64,6 +64,22 @@ function DeviceCard({ isCloud }: { isCloud: boolean }) {
     refresh();
   };
 
+  const sendTest = async () => {
+    setIsBusy(true);
+    try {
+      const res = await fetch("/api/reminders/test", { method: "POST" });
+      const body = await res.json().catch(() => ({}));
+      showToast(
+        res.ok
+          ? { message: `Test sent to ${body.sent} ${body.sent === 1 ? "device" : "devices"}`, tone: "default" }
+          : { message: body.error || "Couldn't send a test", tone: "error" }
+      );
+    } catch {
+      showToast({ message: "Couldn't send a test. Check your connection.", tone: "error" });
+    }
+    setIsBusy(false);
+  };
+
   const isOn = state === "on";
 
   return (
@@ -89,17 +105,28 @@ function DeviceCard({ isCloud }: { isCloud: boolean }) {
           </div>
         </div>
         {isCloud && (state === "on" || state === "off") && (
-          <button
-            onClick={toggle}
-            disabled={isBusy}
-            className={
-              isOn
-                ? "rounded-full border px-4 py-2 text-sm font-medium transition hover:bg-secondary disabled:opacity-50"
-                : "rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:brightness-95 disabled:opacity-50"
-            }
-          >
-            {isBusy ? "…" : isOn ? "Turn off" : "Turn on"}
-          </button>
+          <div className="flex gap-2">
+            {isOn && (
+              <button
+                onClick={sendTest}
+                disabled={isBusy}
+                className="rounded-full border px-4 py-2 text-sm font-medium transition hover:bg-secondary disabled:opacity-50"
+              >
+                Send a test
+              </button>
+            )}
+            <button
+              onClick={toggle}
+              disabled={isBusy}
+              className={
+                isOn
+                  ? "rounded-full border px-4 py-2 text-sm font-medium transition hover:bg-secondary disabled:opacity-50"
+                  : "rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:brightness-95 disabled:opacity-50"
+              }
+            >
+              {isBusy ? "…" : isOn ? "Turn off" : "Turn on"}
+            </button>
+          </div>
         )}
       </div>
       {isCloud && state === "needs-install" && (
