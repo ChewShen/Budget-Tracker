@@ -7,6 +7,7 @@ import { Navbar } from "@/components/navbar";
 import { BottomNav } from "@/components/bottom-nav";
 import { QuickAddModal } from "@/components/quick-add-modal";
 import { ToastHost } from "@/components/toast";
+import { GuestBanner } from "@/components/guest-banner";
 import { Transaction } from "@/lib/types";
 
 // Lets any page open the Add expense sheet, or open it pre-filled to edit an entry.
@@ -29,6 +30,7 @@ function ShellInner({ children }: { children: React.ReactNode }) {
     isLoaded,
     loadError,
     dismissToast,
+    mode,
   } = useBudget();
 
   const openQuickAdd = () => {
@@ -48,6 +50,7 @@ function ShellInner({ children }: { children: React.ReactNode }) {
     <QuickAddContext.Provider value={{ openEdit }}>
       <div className="min-h-screen bg-background text-foreground pb-28 md:pb-12 flex flex-col">
         <Navbar onOpenQuickAdd={openQuickAdd} />
+        {mode === "guest" && <GuestBanner />}
 
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 sm:px-6 py-6 sm:py-8">
           {loadError && (

@@ -15,6 +15,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.12.0] - 2026-09-29
+
+### Added
+- **Continue without an account**: Guest mode from the login page. Guests use the full app with sample data; nothing is saved (no database access, nothing stored in the browser), and a refresh starts over. A banner offers "Sign in to save".
+
+### Changed
+- The sample data is now made-up demo data generated relative to today (about three months of realistic spending, bills and balances), used by guest mode and local-only mode.
+
+### Security
+- Removed real financial data from the app bundle: the previous sample data was generated from the real budget spreadsheet and was downloadable from the public site. (It still exists in the repository and its history; see `docs/roadmap.md`.)
+
+---
+
 ## [0.11.0] - 2026-09-28
 
 ### Added

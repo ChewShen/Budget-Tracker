@@ -18,6 +18,12 @@ yarn-error.log*
 temp.txt
 *.txt.secret
 
+# Real personal data: keep local, never commit
+*.xlsm
+*.xlsx
+scripts/seed_data.sql
+private/
+
 # Python
 __pycache__/
 *.py[cod]

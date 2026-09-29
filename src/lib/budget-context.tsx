@@ -8,9 +8,11 @@ import {
   INITIAL_TAGS,
   INITIAL_TRANSACTIONS,
   INITIAL_SAVINGS,
+  INITIAL_BILLS,
 } from "./mock-data";
 import { createClient } from "./supabase/client";
 import { isSupabaseConfigured } from "./supabase/config";
+import { exitGuest, isGuestSession } from "./guest";
 import { dueAutoBills } from "./bills";
 
 export type NewTransaction = {
@@ -24,17 +26,6 @@ export type NewTransaction = {
 
 export type BillChanges = Partial<Pick<RecurringBill, "expected_amount" | "due_day" | "is_active" | "auto_log">>;
 
-// Bills the app used to hard-code; used to seed local-only mode.
-const DEFAULT_BILL_TAGS = [
-  "Netflix",
-  "iCloud",
-  "Youtube Premium",
-  "Youtube Membership",
-  "Cuckoo",
-  "Electric",
-  "Water",
-  "Season Parking",
-];
 
 export interface Toast {
   id: number;
@@ -50,7 +41,12 @@ export const DEFAULT_PROFILE: UserSalaryProfile = {
   eis_rate: 6.9,
 };
 
+// cloud = Supabase account; local = no Supabase configured (localStorage cache);
+// guest = "Continue without an account" (in memory only, wiped on refresh).
+export type DataMode = "cloud" | "local" | "guest";
+
 interface BudgetContextType {
+  mode: DataMode;
   categories: Category[];
   tags: Tag[];
   transactions: Transaction[];
@@ -124,15 +120,9 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [profile, setProfile] = useState<UserSalaryProfile>(DEFAULT_PROFILE);
   const [emergencyMonths, setEmergencyMonthsState] = useState(6);
-  const [bills, setBills] = useState<RecurringBill[]>(() =>
-    isSupabaseConfigured
-      ? []
-      : INITIAL_TAGS.filter((t) => DEFAULT_BILL_TAGS.includes(t.name)).map((t) => ({
-          id: `bill-${t.id}`,
-          tag_id: t.id,
-          is_active: true,
-        }))
-  );
+  const [bills, setBills] = useState<RecurringBill[]>(isSupabaseConfigured ? [] : INITIAL_BILLS);
+  const [mode, setMode] = useState<DataMode>(isSupabaseConfigured ? "cloud" : "local");
+  const isCloud = mode === "cloud";
   const [toast, setToast] = useState<Toast | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -149,6 +139,18 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     setSelectedMonth(currentMonth());
+
+    if (isGuestSession()) {
+      // Fresh demo data on every load; nothing is read from or written to storage.
+      setMode("guest");
+      setCategories(INITIAL_CATEGORIES);
+      setTags(INITIAL_TAGS);
+      setTransactions(INITIAL_TRANSACTIONS);
+      setSavings(INITIAL_SAVINGS);
+      setBills(INITIAL_BILLS);
+      setIsLoaded(true);
+      return;
+    }
 
     if (!isSupabaseConfigured) {
       // Local-only mode: restore the offline cache over the mock data.
@@ -251,7 +253,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
   // (With Supabase, the daily pg_cron job does this; see scripts/migrations/2026-09-28_auto_bills.sql.)
   const autoLogged = useRef(false);
   useEffect(() => {
-    if (isSupabaseConfigured || !isLoaded || autoLogged.current) return;
+    if (isCloud || !isLoaded || autoLogged.current) return;
     autoLogged.current = true;
     const due = dueAutoBills(bills, tags, transactions);
     if (due.length === 0) return;
@@ -273,7 +275,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
 
   // Offline cache for local-only mode.
   useEffect(() => {
-    if (isSupabaseConfigured || !isLoaded) return;
+    if (mode !== "local" || !isLoaded) return; // guests never persist
     try {
       localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(transactions));
       localStorage.setItem(STORAGE_KEYS.SAVINGS, JSON.stringify(savings));
@@ -284,7 +286,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
     } catch (e) {
       console.error("Failed to save to localStorage", e);
     }
-  }, [transactions, savings, profile, categories, tags, bills, isLoaded]);
+  }, [transactions, savings, profile, categories, tags, bills, isLoaded, mode]);
 
   const addTransaction = async (txInput: NewTransaction) => {
     const cat = categories.find((c) => c.id === txInput.category_id);
@@ -309,7 +311,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
     setSelectedMonth(txInput.date.slice(0, 7));
 
     // 2. Persist to Supabase in the background (user_id defaults to auth.uid() in the database)
-    if (isSupabaseConfigured) {
+    if (isCloud) {
       const supabase = createClient();
       const { data, error } = await supabase
         .from("transactions")
@@ -347,7 +349,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
     if (!previous) return;
 
     // A just-added row keeps its temporary id until the insert returns; updating it now would miss.
-    if (isSupabaseConfigured && id.startsWith("tx-")) {
+    if (isCloud && id.startsWith("tx-")) {
       showToast({ tone: "error", message: "Still saving that entry. Try again in a moment." });
       return;
     }
@@ -365,7 +367,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
     setTransactions((prev) => prev.map((t) => (t.id === id ? updated : t)));
     setSelectedMonth(txInput.date.slice(0, 7));
 
-    if (isSupabaseConfigured) {
+    if (isCloud) {
       const { error } = await createClient()
         .from("transactions")
         .update({
@@ -396,7 +398,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
   const commitDelete = useCallback(
     async (tx: Transaction) => {
       // Temp ids ("tx-...") were never saved remotely; local-only mode has nothing to delete remotely.
-      if (!isSupabaseConfigured || tx.id.startsWith("tx-")) return;
+      if (!isCloud || tx.id.startsWith("tx-")) return;
       const { error } = await createClient().from("transactions").delete().eq("id", tx.id);
       if (error) {
         console.error("Supabase delete error:", error);
@@ -404,7 +406,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
         showToast({ tone: "error", message: `Couldn't delete ${tx.tag_name}. It has been restored.` });
       }
     },
-    [showToast]
+    [showToast, isCloud]
   );
 
   const flushPendingDelete = useCallback(() => {
@@ -461,7 +463,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
       return [...prev, updated];
     });
 
-    if (isSupabaseConfigured) {
+    if (isCloud) {
       const supabase = createClient();
       const {
         data: { user },
@@ -495,7 +497,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
   const updateProfile = async (next: UserSalaryProfile) => {
     const previous = profile;
     setProfile(next);
-    if (!isSupabaseConfigured) return;
+    if (!isCloud) return;
 
     const supabase = createClient();
     const {
@@ -543,7 +545,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
       return false;
     }
     let created: RecurringBill = { id: `bill-${Date.now()}`, tag_id: tagId, is_active: true, ...changes };
-    if (isSupabaseConfigured) {
+    if (isCloud) {
       const { data, error } = await createClient()
         .from("recurring_sentinel")
         .insert({ tag_id: tagId, is_active: true, ...changes })
@@ -561,7 +563,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updateBill = async (id: string, changes: BillChanges) => {
-    if (isSupabaseConfigured) {
+    if (isCloud) {
       const { error } = await createClient().from("recurring_sentinel").update(changes).eq("id", id);
       if (error) {
         console.error("Supabase bill update error:", error);
@@ -574,7 +576,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
   };
 
   const removeBill = async (id: string) => {
-    if (isSupabaseConfigured) {
+    if (isCloud) {
       const { error } = await createClient().from("recurring_sentinel").delete().eq("id", id);
       if (error) {
         console.error("Supabase bill delete error:", error);
@@ -598,7 +600,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
       return null;
     }
     let created: Category = { id: `cat-${Date.now()}`, name, icon };
-    if (isSupabaseConfigured) {
+    if (isCloud) {
       const { data, error } = await createClient().from("categories").insert({ name, icon }).select().single();
       if (error || !data) {
         console.error("Supabase category insert error:", error);
@@ -620,7 +622,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
       return false;
     }
     const changes = { name, icon: icon ?? current.icon ?? null };
-    if (isSupabaseConfigured) {
+    if (isCloud) {
       const { error } = await createClient().from("categories").update(changes).eq("id", id);
       if (error) {
         console.error("Supabase category update error:", error);
@@ -649,7 +651,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
       showToast({ tone: "error", message: `${billTag.name} is a monthly bill. Remove it from Monthly bills first.` });
       return false;
     }
-    if (isSupabaseConfigured) {
+    if (isCloud) {
       // Tags cascade with the category.
       const { error } = await createClient().from("categories").delete().eq("id", id);
       if (error) {
@@ -672,7 +674,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
       return null;
     }
     let created: Tag = { id: `tag-${Date.now()}`, category_id: categoryId, name };
-    if (isSupabaseConfigured) {
+    if (isCloud) {
       const { data, error } = await createClient()
         .from("tags")
         .insert({ category_id: categoryId, name })
@@ -697,7 +699,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
       showToast({ tone: "error", message: `Tag "${name}" already exists in this category.` });
       return false;
     }
-    if (isSupabaseConfigured) {
+    if (isCloud) {
       const { error } = await createClient().from("tags").update({ name }).eq("id", id);
       if (error) {
         console.error("Supabase tag update error:", error);
@@ -725,7 +727,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
       showToast({ tone: "error", message: `${current.name} is a monthly bill. Remove it from Monthly bills first.` });
       return false;
     }
-    if (isSupabaseConfigured) {
+    if (isCloud) {
       const { error } = await createClient().from("tags").delete().eq("id", id);
       if (error) {
         console.error("Supabase tag delete error:", error);
@@ -742,7 +744,8 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
   const setEmergencyMonths = async (months: number) => {
     const previous = emergencyMonths;
     setEmergencyMonthsState(months);
-    if (!isSupabaseConfigured) {
+    if (!isCloud) {
+      if (mode === "guest") return;
       try {
         localStorage.setItem(STORAGE_KEYS.EMERGENCY_MONTHS, String(months));
       } catch {
@@ -770,7 +773,8 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
-    if (!isSupabaseConfigured) return;
+    if (mode === "guest") return exitGuest();
+    if (!isCloud) return;
     await createClient().auth.signOut();
     window.location.replace("/login");
   };
@@ -778,6 +782,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
   return (
     <BudgetContext.Provider
       value={{
+        mode,
         categories,
         tags,
         transactions,
