@@ -20,6 +20,29 @@ export interface RecurringBill {
   auto_log?: boolean; // added automatically on the due day (needs expected_amount + due_day)
 }
 
+export interface Goal {
+  id: string;
+  name: string;
+  target_amount: number; // full price
+  trade_in_name?: string | null; // what you'll trade in, e.g. "iPhone 13"
+  trade_in_value: number; // expected trade-in value (0 = none)
+  trade_in_updated?: string | null; // YYYY-MM-DD, when the value was last checked
+  target_date?: string | null; // YYYY-MM-DD
+  link?: string | null;
+  priority: number; // lower = higher on the list
+  status: "active" | "bought" | "archived";
+  bought_at?: string | null;
+  created_at?: string;
+}
+
+export interface GoalContribution {
+  id: string;
+  goal_id: string;
+  amount: number; // positive = set aside, negative = taken back
+  date: string; // YYYY-MM-DD
+  note?: string | null;
+}
+
 export interface Transaction {
   id: string;
   user_id?: string;

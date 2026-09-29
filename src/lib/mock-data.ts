@@ -1,4 +1,4 @@
-import { Category, MonthlySavings, RecurringBill, Tag, Transaction } from "./types";
+import { Category, Goal, GoalContribution, MonthlySavings, RecurringBill, Tag, Transaction } from "./types";
 
 // Made-up demo data for guest mode and local-only mode (no Supabase).
 // Generated from today's date (last two full months + this month so far) with a fixed seed,
@@ -150,6 +150,50 @@ function buildSavings(today: Date): MonthlySavings[] {
   ];
 }
 
+// ---- Goals: an upgrade with a trade-in, and a trip ----
+
+function buildGoals(today: Date): { goals: Goal[]; contributions: GoalContribution[] } {
+  const day = (monthsFromNow: number, d: number) => {
+    const x = new Date(today.getFullYear(), today.getMonth() + monthsFromNow, d);
+    return `${x.getFullYear()}-${pad(x.getMonth() + 1)}-${pad(x.getDate())}`;
+  };
+  const goals: Goal[] = [
+    {
+      id: "goal-phone",
+      name: "iPhone 17 Pro",
+      target_amount: 5499,
+      trade_in_name: "iPhone 13",
+      trade_in_value: 1200,
+      trade_in_updated: day(-1, 15),
+      target_date: day(6, 1),
+      link: null,
+      priority: 0,
+      status: "active",
+    },
+    {
+      id: "goal-japan",
+      name: "Japan trip",
+      target_amount: 6000,
+      trade_in_value: 0,
+      target_date: day(10, 1),
+      link: null,
+      priority: 1,
+      status: "active",
+    },
+  ];
+  const contributions: GoalContribution[] = [
+    { id: "gc-1", goal_id: "goal-phone", amount: 400, date: day(-2, 26) },
+    { id: "gc-2", goal_id: "goal-phone", amount: 400, date: day(-1, 26) },
+    { id: "gc-3", goal_id: "goal-phone", amount: 250, date: day(0, 5), note: "Bonus from overtime" },
+    { id: "gc-4", goal_id: "goal-japan", amount: 300, date: day(-1, 26) },
+    { id: "gc-5", goal_id: "goal-japan", amount: 300, date: day(0, 1) },
+  ];
+  return { goals, contributions };
+}
+
 const TODAY = new Date();
 export const INITIAL_TRANSACTIONS: Transaction[] = buildTransactions(TODAY);
 export const INITIAL_SAVINGS: MonthlySavings[] = buildSavings(TODAY);
+const DEMO_GOALS = buildGoals(TODAY);
+export const INITIAL_GOALS: Goal[] = DEMO_GOALS.goals;
+export const INITIAL_GOAL_CONTRIBUTIONS: GoalContribution[] = DEMO_GOALS.contributions;
