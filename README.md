@@ -80,6 +80,8 @@ Guest mode never touches the database and stores nothing in your browser, so **n
 - **Database & Authentication**: [Supabase (PostgreSQL)](https://supabase.com/) with Row-Level Security (RLS) and `pg_cron`
 - **PWA Integration**: Web App Manifest and home-screen icons
 - **Quality**: TypeScript, ESLint, formula parity tests, GitHub Actions CI
+
+Why these tools and the main design choices: [`docs/decisions.md`](docs/decisions.md).
 - **Hosting**: [Vercel](https://vercel.com/) (free Hobby tier)
 
 ---
