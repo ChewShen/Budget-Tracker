@@ -20,6 +20,12 @@ export interface RecurringBill {
   auto_log?: boolean; // added automatically on the due day (needs expected_amount + due_day)
 }
 
+export interface Budget {
+  id: string;
+  category_id: string;
+  monthly_limit: number;
+}
+
 export interface GoalDiscount {
   id: string;
   label: string; // e.g. "11.11 voucher", "Card cashback"

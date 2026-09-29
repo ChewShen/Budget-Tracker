@@ -53,7 +53,7 @@ export function Navbar({ onOpenQuickAdd }: NavbarProps) {
             href="/settings"
             className={cn(
               "flex h-9 w-9 items-center justify-center rounded-full transition hover:bg-secondary hover:text-foreground",
-              pathname === "/settings" ? "bg-secondary text-foreground" : "text-muted-foreground"
+              pathname.startsWith("/settings") ? "bg-secondary text-foreground" : "text-muted-foreground"
             )}
             aria-label="Settings"
             title="Settings"

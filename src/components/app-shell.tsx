@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { BudgetProvider, useBudget } from "@/lib/budget-context";
 import { Navbar } from "@/components/navbar";
@@ -39,6 +39,17 @@ function ShellInner({ children }: { children: React.ReactNode }) {
     setEditing(null);
     setIsQuickAddOpen(true);
   };
+
+  // "/?add=1" (the "Nothing logged today" reminder) opens Add expense straight away.
+  useEffect(() => {
+    if (!isLoaded) return;
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("add") !== "1") return;
+    url.searchParams.delete("add");
+    window.history.replaceState(null, "", url.pathname + url.search);
+    setEditing(null);
+    setIsQuickAddOpen(true);
+  }, [isLoaded]);
 
   const openEdit = (tx: Transaction) => {
     dismissToast();

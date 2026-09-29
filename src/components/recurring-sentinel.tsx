@@ -94,7 +94,7 @@ export function RecurringSentinel({ items, loggableBills, onLogMissing }: Recurr
         <h3 className="text-[15px] font-semibold">Monthly bills</h3>
         <p className="mt-2 text-sm text-muted-foreground">
           No monthly bills yet. Add subscriptions and utilities in{" "}
-          <Link href="/settings" className="font-medium text-foreground underline underline-offset-2">
+          <Link href="/settings/bills" className="font-medium text-foreground underline underline-offset-2">
             Settings
           </Link>{" "}
           to see what&apos;s still unpaid each month.

@@ -35,7 +35,10 @@ export async function middleware(request: NextRequest) {
   // blocks them from the database, so letting them past this redirect exposes nothing.
   const isGuest = request.cookies.get(GUEST_COOKIE)?.value === "1";
 
-  if (!user && !isLoginPage && !isGuest) {
+  // API routes check auth themselves (the reminders cron has no user session, only CRON_SECRET).
+  const isApi = request.nextUrl.pathname.startsWith("/api/");
+
+  if (!user && !isLoginPage && !isGuest && !isApi) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
   if (user && isLoginPage) {
@@ -48,6 +51,6 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // Skip Next internals and public static files (manifest, icons).
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.json|.*\\.(?:png|svg|ico|webp)$).*)"],
+  // Skip Next internals and public static files (manifest, service worker, icons).
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.json|sw.js|.*\\.(?:png|svg|ico|webp)$).*)"],
 };
