@@ -182,9 +182,9 @@ function buildGoals(today: Date): { goals: Goal[]; contributions: GoalContributi
     },
   ];
   const contributions: GoalContribution[] = [
-    { id: "gc-1", goal_id: "goal-phone", amount: 400, date: day(-2, 26) },
-    { id: "gc-2", goal_id: "goal-phone", amount: 400, date: day(-1, 26) },
-    { id: "gc-3", goal_id: "goal-phone", amount: 250, date: day(0, 5), note: "Bonus from overtime" },
+    { id: "gc-1", goal_id: "goal-phone", amount: 600, date: day(-2, 26) },
+    { id: "gc-2", goal_id: "goal-phone", amount: 600, date: day(-1, 26) },
+    { id: "gc-3", goal_id: "goal-phone", amount: 450, date: day(0, 5), note: "Bonus from overtime" },
     { id: "gc-4", goal_id: "goal-japan", amount: 300, date: day(-1, 26) },
     { id: "gc-5", goal_id: "goal-japan", amount: 300, date: day(0, 1) },
   ];
