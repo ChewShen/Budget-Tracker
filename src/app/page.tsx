@@ -11,6 +11,8 @@ import { SpendHero } from "@/components/spend-hero";
 import { SalaryEngine } from "@/components/salary-engine";
 import { RecurringSentinel, type BillStatus } from "@/components/recurring-sentinel";
 import { canAutoLog } from "@/lib/bills";
+import { categoryLabel } from "@/lib/categories";
+import { formatCurrency } from "@/lib/utils";
 import {
   baseline,
   monthForecast,
@@ -25,6 +27,9 @@ import { SpendSplitCard } from "@/components/spend-split";
 import { SpendingCalendar } from "@/components/spending-calendar";
 import { InsightsCard } from "@/components/insights-card";
 import { SpendingTrend } from "@/components/spending-trend";
+import { BudgetsCard, type BudgetRow } from "@/components/budgets-card";
+import { budgetStatus } from "@/lib/budgets";
+import type { Insight } from "@/lib/analytics";
 import { CategoryChart } from "@/components/category-chart";
 import { TagsBarChart } from "@/components/tags-bar-chart";
 import { LedgerTable } from "@/components/ledger-table";
@@ -44,6 +49,8 @@ export default function DashboardPage() {
     updateProfile,
     tags,
     bills,
+    budgets,
+    categories,
     addTransaction,
     showToast,
     mode,
@@ -205,6 +212,51 @@ export default function DashboardPage() {
     billRows.filter((r) => r.status !== "logged" && r.amount !== null).reduce((sum, r) => sum + (r.amount as number), 0)
   );
 
+  // 8b. Budgets: each budgeted category this month; bills still to come in it are included.
+  const budgetRows: BudgetRow[] = budgets.flatMap((b) => {
+    const category = categories.find((c) => c.id === b.category_id);
+    if (!category) return [];
+    const upcoming = billRows
+      .filter((r) => r.category_id === b.category_id && r.status !== "logged" && r.amount !== null)
+      .reduce((sum, r) => sum + (r.amount as number), 0);
+    return [
+      {
+        categoryName: category.name,
+        status: budgetStatus({
+          limit: b.monthly_limit,
+          categoryTxs: monthTransactions.filter((t) => t.category_id === b.category_id),
+          month: selectedMonth,
+          today: todayStr,
+          billTagIds,
+          upcomingBills: selectedMonth >= currentMonthStr ? upcoming : 0,
+        }),
+      },
+    ];
+  });
+
+  // Insights: the strongest budget warning competes with the general highlights.
+  const worstBudget = [...budgetRows]
+    .filter((r) => r.status.state !== "ok")
+    .sort((a, b) => (b.status.spent - b.status.limit) - (a.status.spent - a.status.limit) || b.status.projected - a.status.projected)[0];
+  const budgetInsight: Insight[] = worstBudget
+    ? [
+        {
+          id: "budget",
+          tone: "up",
+          title:
+            worstBudget.status.state === "over"
+              ? `${categoryLabel(worstBudget.categoryName)} is ${formatCurrency(worstBudget.status.spent - worstBudget.status.limit)} over budget`
+              : `${categoryLabel(worstBudget.categoryName)} is on pace to go over budget`,
+          detail:
+            worstBudget.status.state === "over"
+              ? `Spent ${formatCurrency(worstBudget.status.spent)} of ${formatCurrency(worstBudget.status.limit)}.`
+              : `Heading for ${formatCurrency(worstBudget.status.projected)} against ${formatCurrency(worstBudget.status.limit)}.`,
+          score: 1000,
+        },
+      ]
+    : [];
+  const insights = [...budgetInsight, ...monthInsights(transactions, selectedMonth, todayStr, 3)].slice(0, 3);
+
   // 9. Monthly trend ending at the selected month; average over completed months only.
   const trend = monthlyTotals(transactions, selectedMonth).map((m) => {
     const projectedRest = forecast && m.month === selectedMonth ? Math.max(0, forecast.projected - m.total) : 0;
@@ -282,7 +334,9 @@ export default function DashboardPage() {
         savingsRate={salaryMetrics.savingsRate}
       />
 
-      <InsightsCard insights={monthInsights(transactions, selectedMonth, todayStr)} />
+      <BudgetsCard rows={budgetRows} monthName={monthLabel} />
+
+      <InsightsCard insights={insights} />
 
       <SpendingTrend
         data={trend}
