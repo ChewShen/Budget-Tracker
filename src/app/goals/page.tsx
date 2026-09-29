@@ -2,17 +2,31 @@
 
 import { useState } from "react";
 import { format, parseISO } from "date-fns";
-import { Plus, Target } from "lucide-react";
+import { PartyPopper, Plus, Target } from "lucide-react";
 import { useBudget } from "@/lib/budget-context";
 import { GoalCard } from "@/components/goal-card";
 import { GoalSheet } from "@/components/goal-sheet";
+import { BoughtSheet } from "@/components/bought-sheet";
 import { earmarkedTotal, goalProgress, netTarget } from "@/lib/goals";
 import { formatCurrency } from "@/lib/utils";
 import type { Goal } from "@/lib/types";
 
 export default function GoalsPage() {
-  const { goals, goalContributions, addGoal, updateGoal, deleteGoal, moveGoal, addContribution, deleteContribution } =
-    useBudget();
+  const {
+    goals,
+    goalContributions,
+    addGoal,
+    updateGoal,
+    deleteGoal,
+    moveGoal,
+    addContribution,
+    deleteContribution,
+    markGoalBought,
+    categories,
+    tags,
+    showToast,
+  } = useBudget();
+  const [boughtGoal, setBoughtGoal] = useState<Goal | null>(null);
   const [sheetGoal, setSheetGoal] = useState<Goal | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
 
@@ -80,20 +94,36 @@ export default function GoalsPage() {
       )}
 
       <div className="grid grid-cols-1 gap-4 sm:gap-5 lg:grid-cols-2">
-        {active.map((goal, i) => (
-          <GoalCard
-            key={goal.id}
-            goal={goal}
-            progress={goalProgress(goal, goalContributions)}
-            contributions={goalContributions.filter((c) => c.goal_id === goal.id)}
-            canMoveUp={i > 0}
-            canMoveDown={i < active.length - 1}
-            onMove={(dir) => moveGoal(goal.id, dir)}
-            onEdit={() => openSheet(goal)}
-            onAddMoney={(amount, note) => addContribution(goal.id, amount, note)}
-            onDeleteContribution={deleteContribution}
-          />
-        ))}
+        {active.map((goal, i) => {
+          const progress = goalProgress(goal, goalContributions);
+          return (
+            <GoalCard
+              key={goal.id}
+              goal={goal}
+              progress={progress}
+              contributions={goalContributions.filter((c) => c.goal_id === goal.id)}
+              canMoveUp={i > 0}
+              canMoveDown={i < active.length - 1}
+              onMove={(dir) => moveGoal(goal.id, dir)}
+              onEdit={() => openSheet(goal)}
+              onAddMoney={(amount, note) => addContribution(goal.id, amount, note)}
+              onDeleteContribution={deleteContribution}
+              actions={
+                <button
+                  onClick={() => setBoughtGoal(goal)}
+                  className={
+                    progress.isReady
+                      ? "flex items-center gap-1.5 rounded-full border border-success/50 px-4 py-2 text-sm font-semibold text-success transition hover:bg-success/10"
+                      : "rounded-full border px-4 py-2 text-sm font-medium text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+                  }
+                >
+                  {progress.isReady && <PartyPopper className="h-4 w-4" />}
+                  Bought it
+                </button>
+              }
+            />
+          );
+        })}
       </div>
 
       {completed.length > 0 && (
@@ -112,6 +142,18 @@ export default function GoalsPage() {
           </ul>
         </section>
       )}
+
+      <BoughtSheet
+        goal={boughtGoal}
+        categories={categories}
+        tags={tags}
+        onClose={() => setBoughtGoal(null)}
+        onConfirm={async (goal, expense) => {
+          const ok = await markGoalBought(goal.id, expense);
+          if (ok) showToast({ tone: "default", message: `${goal.name} bought · logged as a one-off expense` });
+          return ok;
+        }}
+      />
 
       <GoalSheet
         isOpen={isSheetOpen}
