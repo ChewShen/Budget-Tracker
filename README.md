@@ -49,6 +49,10 @@ Guest mode never touches the database and stores nothing in your browser, so **n
 - Overview shows **Logged / Due in 2 days / Overdue / Missing**, and logs unpaid bills in one tap.
 - **Auto-add** fixed bills on their due day via a daily **pg_cron** job in Postgres.
 
+### 🚦 Budgets & reminders
+- **Monthly budget per category**: Overview shows spend against each limit, the pace ("on pace for RM 430"), what's left per day, and flags budgets at risk or over.
+- **Phone notifications** around 8pm: bills due tomorrow or overdue, goal vouchers about to expire, budgets at 80% or over, and an optional "nothing logged today" nudge. Each is sent once; Settings shows a preview of what would go out tonight.
+
 ### 🏦 Savings & salary
 - **Malaysian salary engine**: EPF, SOCSO and EIS deductions, take-home pay and savings rate (editable).
 - **Month-end balances** per account with daily-compounded interest estimates (GXBank, RYT).
@@ -93,6 +97,7 @@ Guest mode never touches the database and stores nothing in your browser, so **n
 │  • Next.js App Router (No cold starts, 0 server cost)       │
 │  • Salary, Interest & Daily Burn Rate Math Engines         │
 │  • Optimistic UI Updates (< 1ms)                            │
+│  • Vercel Cron: daily reminders via Web Push (8pm MYT)      │
 └──────────────────────────────┬──────────────────────────────┘
                                │ Authenticated REST API
 ┌──────────────────────────────▼──────────────────────────────┐
@@ -220,6 +225,7 @@ One-off SQL changes for existing databases live in [`scripts/migrations/`](scrip
 - `2026-09-28_emergency_goal.sql`: adds `user_profiles.emergency_months` (emergency fund goal on the Savings page, default 6).
 - `2026-09-29_goals.sql`: `goals` (targets with optional trade-in and discounts) and `goal_contributions` (money set aside) tables, owner-only RLS. Re-runnable: running it again adds anything new.
 - `2026-09-29_budgets.sql`: `budgets` table (monthly limit per category), owner-only RLS.
+- `2026-09-29_reminders.sql`: `push_subscriptions` (devices), `reminder_settings` (which reminders) and `reminder_log` (what was already sent) for phone notifications. See [Reminders](#5-reminders-optional).
 
 ---
 
@@ -252,6 +258,24 @@ npm run lint        # ESLint (flat config in eslint.config.mjs)
 npm test            # Formula parity with Excel (scripts/test_formulas.mjs)
 npm run build       # Build optimized Next.js production bundle
 ```
+
+### 5. Reminders (optional)
+Phone notifications are sent by a daily Vercel Cron job (`vercel.json`, 12:00 UTC = 8pm Malaysia time) that calls `/api/reminders`. To turn them on:
+
+1. Run `scripts/migrations/2026-09-29_reminders.sql` in the Supabase SQL Editor.
+2. Generate a key pair: `npx web-push generate-vapid-keys`.
+3. Add these environment variables in Vercel (Project → Settings → Environment Variables), then redeploy:
+
+   | Variable | Value |
+   | --- | --- |
+   | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | Public key from step 2 |
+   | `VAPID_PRIVATE_KEY` | Private key from step 2 |
+   | `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Project Settings → API keys → `service_role` (server only, never `NEXT_PUBLIC_`) |
+   | `CRON_SECRET` | Any long random string, e.g. `openssl rand -hex 32`. Vercel sends it to the cron route; other callers get 401. |
+
+4. On each device: **Settings → Reminders → Turn on**, then **Send a test**. On iPhone/iPad (iOS 16.4+) this only works from the Home Screen app, not a Safari tab.
+
+To run the job by hand: `curl -H "Authorization: Bearer $CRON_SECRET" https://<your-app>/api/reminders`.
 
 ---
 
