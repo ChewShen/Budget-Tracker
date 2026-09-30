@@ -58,7 +58,7 @@ Each entry covers what was chosen, why, and what it costs. For what changed and 
 - **Why:** They started hard-coded from the spreadsheet. They now live in tables that can be edited in Settings, and renaming keeps every past expense linked, because expenses reference ids, not names.
 - **Per account:** With one user they were shared lookup tables. Once friends could have accounts, sharing meant anyone could rename or delete everyone's categories, so each account now owns its own (names unique per account). New accounts get a default set from a database trigger, so they can log an expense straight away.
 - **References are checked, not just rows:** RLS also checks that an expense, bill or budget points at the account's *own* category and tag, so ids from another account can't be used even if known.
-- **Known gap:** A few features still match by name (the "Food" card, meal-time tag defaults). Moving those to ids is on the roadmap.
+- **Marked, not matched by name:** The Food & dining card and the meal Add expense suggests for the time of day used to look for a category called "Food" and tags called "Lunch", "Dinner" and so on, so renaming them quietly broke both. They're now found by a mark (`categories.role`, `tags.role`), shown as a star in Settings, and can be renamed freely. Locking those names was the alternative, but it would stop friends using their own wording ("Makan"). Deleting a starred one asks first rather than being blocked.
 
 ---
 

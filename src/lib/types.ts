@@ -3,12 +3,14 @@ export interface Category {
   name: string;
   color?: string;
   icon?: string | null; // key into CATEGORY_ICON_OPTIONS; null = pick by name
+  role?: "food" | null; // marked for the Food & dining card and meal suggestions (see lib/roles.ts)
 }
 
 export interface Tag {
   id: string;
   category_id: string;
   name: string;
+  role?: "breakfast" | "lunch" | "snack" | "dinner" | "supper" | null; // meal suggested by time of day
 }
 
 export interface RecurringBill {

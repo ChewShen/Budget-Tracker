@@ -7,7 +7,7 @@ import { Budget, Category, Goal, GoalContribution, MonthlySavings, RecurringBill
 // ---- Categories & tags (generic) ----
 
 const TAXONOMY: Record<string, string[]> = {
-  Food: ["Breakfast", "Lunch", "Dinner", "Coffee", "Snack", "Groceries"],
+  Food: ["Breakfast", "Lunch", "Dinner", "Supper", "Coffee", "Snack", "Groceries"],
   Transport: ["Petrol", "Parking", "Toll", "Grab", "Season Parking"],
   Home_Bills: ["Electric", "Water", "Internet", "Phone"],
   Subscription: ["Netflix", "Spotify", "iCloud"],
@@ -21,10 +21,20 @@ const TAXONOMY: Record<string, string[]> = {
 
 export const INITIAL_CATEGORIES: Category[] = Object.keys(TAXONOMY)
   .sort()
-  .map((name, i) => ({ id: `cat-${i + 1}`, name }));
+  .map((name, i) => ({ id: `cat-${i + 1}`, name, role: name === "Food" ? ("food" as const) : null }));
+
+// Same marks as the default set for new accounts (scripts/migrations/2026-09-30_roles.sql).
+const MEAL_TAGS = ["breakfast", "lunch", "snack", "dinner", "supper"] as const;
+const mealRole = (category: string, tag: string) =>
+  category === "Food" ? MEAL_TAGS.find((m) => m === tag.toLowerCase()) ?? null : null;
 
 export const INITIAL_TAGS: Tag[] = INITIAL_CATEGORIES.flatMap((c) =>
-  TAXONOMY[c.name].map((name) => ({ id: `tag-${c.name}-${name}`.replace(/\s+/g, "-"), category_id: c.id, name }))
+  TAXONOMY[c.name].map((name) => ({
+    id: `tag-${c.name}-${name}`.replace(/\s+/g, "-"),
+    category_id: c.id,
+    name,
+    role: mealRole(c.name, name),
+  }))
 ).sort((a, b) => a.name.localeCompare(b.name));
 
 const tag = (name: string) => INITIAL_TAGS.find((t) => t.name === name) as Tag;

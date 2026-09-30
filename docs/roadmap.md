@@ -27,7 +27,6 @@ When one is picked up, move it to `docs/changelog.md` under the version that shi
 
 ## Robustness
 
-- **Match by id instead of name**: The "Food & dining" card and the time-of-day meal default look for a category literally named "Food" and tags named "Breakfast", "Lunch", …; make these configurable in Settings.
 - **Automated tests**: Turn the ad-hoc browser checks into Playwright tests in CI, and add unit tests for `src/lib/analytics.ts`, `savings.ts` and `bills.ts`.
 - **Recharts v3**: v2 is deprecated.
 

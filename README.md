@@ -230,6 +230,7 @@ One-off SQL changes for existing databases live in [`scripts/migrations/`](scrip
 - `2026-09-29_budgets.sql`: `budgets` table (monthly limit per category), owner-only RLS.
 - `2026-09-29_reminders.sql`: `push_subscriptions` (devices), `reminder_settings` (which reminders) and `reminder_log` (what was already sent) for phone notifications. See [Reminders](#5-reminders-optional).
 - `2026-09-30_multi_user.sql`: each account gets its own categories and tags (existing ones stay yours), category names are unique per account, expenses/bills/budgets can only use your own categories and tags, and new accounts start with a profile and a default set of categories and tags. See [Adding a friend](#adding-a-friend). After this, `secure_rls.sql` refuses to run (it would re-open categories and tags).
+- `2026-09-30_roles.sql`: marks each account's food category and meal tags (breakfast, lunch, tea time, dinner, late night) so the Food & dining card and the time-of-day tag in Add expense keep working after renames; new accounts also get a Supper tag. Starred in Settings → Categories & tags.
 
 ### Adding a friend
 Sign-up stays off, so strangers can't create accounts. To give someone their own account:
