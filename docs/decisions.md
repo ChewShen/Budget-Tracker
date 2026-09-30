@@ -54,8 +54,10 @@ Each entry covers what was chosen, why, and what it costs. For what changed and 
 - **Missing tables are tolerated:** Optional features (bills, goals, budgets, reminders) keep the rest of the app working if their migration hasn't been run yet, and the error message names the file to run.
 - **Trade-off:** No migration tool tracks what has run. For one database, maintained by one person, this is simpler than setting up a migration CLI.
 
-### Categories and tags are data, not code
+### Categories and tags are data, not code, and per account
 - **Why:** They started hard-coded from the spreadsheet. They now live in tables that can be edited in Settings, and renaming keeps every past expense linked, because expenses reference ids, not names.
+- **Per account:** With one user they were shared lookup tables. Once friends could have accounts, sharing meant anyone could rename or delete everyone's categories, so each account now owns its own (names unique per account). New accounts get a default set from a database trigger, so they can log an expense straight away.
+- **References are checked, not just rows:** RLS also checks that an expense, bill or budget points at the account's *own* category and tag, so ids from another account can't be used even if known.
 - **Known gap:** A few features still match by name (the "Food" card, meal-time tag defaults). Moving those to ids is on the roadmap.
 
 ---
@@ -63,7 +65,8 @@ Each entry covers what was chosen, why, and what it costs. For what changed and 
 ## 3. Security & privacy
 
 ### Email + password sign-in, no public sign-up
-- **Why:** Magic-link (email OTP) sign-in needed a custom SMTP server to be reliable. Email + password works on Supabase's defaults. Sign-up is disabled because this is a single-owner app.
+- **Why:** Magic-link (email OTP) sign-in needed a custom SMTP server to be reliable. Email + password works on Supabase's defaults.
+- **Accounts are added by hand:** Public sign-up stays off, because the site is public as a portfolio and anyone could otherwise create accounts on the free-tier database. Friends are added in the Supabase dashboard with a temporary password (Supabase's built-in email only reaches the project team, so invite emails wouldn't arrive) and change it in Settings → Account.
 
 ### Row-Level Security on every table
 - **Why:** The anon key is public: it's in the JavaScript bundle by design. What keeps other people out is RLS. Every table has an owner-only policy (`user_id = auth.uid()`), and `user_id` defaults to `auth.uid()`, so the app never sends it.

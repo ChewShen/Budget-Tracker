@@ -66,6 +66,7 @@ Guest mode never touches the database and stores nothing in your browser, so **n
 
 ### 🔐 Data & privacy
 - **Email + password sign-in**, no public sign-up; every table locked with owner-only **Row-Level Security**.
+- **Multiple accounts**: friends get their own separate data (categories and tags included), starting from a default set. Accounts are added in the Supabase dashboard; each person can change their password in Settings.
 - **Guest mode** with generated demo data, isolated from the database.
 - **Export**: month or all expenses as Excel-friendly CSV, savings balances, or a full JSON backup.
 - Refined dark theme with a light mode, and layouts that adapt to touch and mouse.
@@ -217,7 +218,7 @@ The seed script opens the tables so data can be loaded. Close them afterwards:
 2. **Authentication → Sign In / Providers → Email** → turn off **Allow new users to sign up**.
 3. Set your email in [`scripts/secure_rls.sql`](scripts/secure_rls.sql) and run it in the SQL Editor.
 
-This assigns all data to your user and replaces every policy with owner-only RLS (categories and tags stay editable by the signed-in owner from **Settings → Categories & tags**). The app then requires sign-in (`/login`). **Do not re-run `seed_data.sql` afterwards**; it re-opens the tables.
+This assigns all data to your user and replaces every policy with owner-only RLS. Then run the migrations below; `2026-09-30_multi_user.sql` makes categories and tags per account too. The app then requires sign-in (`/login`). **Do not re-run `seed_data.sql` afterwards**; it re-opens the tables.
 
 ### 4. Migrations
 One-off SQL changes for existing databases live in [`scripts/migrations/`](scripts/migrations/). Run each new file once in the SQL Editor, in date order:
@@ -228,6 +229,15 @@ One-off SQL changes for existing databases live in [`scripts/migrations/`](scrip
 - `2026-09-29_goals.sql`: `goals` (targets with optional trade-in and discounts) and `goal_contributions` (money set aside) tables, owner-only RLS. Re-runnable: running it again adds anything new.
 - `2026-09-29_budgets.sql`: `budgets` table (monthly limit per category), owner-only RLS.
 - `2026-09-29_reminders.sql`: `push_subscriptions` (devices), `reminder_settings` (which reminders) and `reminder_log` (what was already sent) for phone notifications. See [Reminders](#5-reminders-optional).
+- `2026-09-30_multi_user.sql`: each account gets its own categories and tags (existing ones stay yours), category names are unique per account, expenses/bills/budgets can only use your own categories and tags, and new accounts start with a profile and a default set of categories and tags. See [Adding a friend](#adding-a-friend). After this, `secure_rls.sql` refuses to run (it would re-open categories and tags).
+
+### Adding a friend
+Sign-up stays off, so strangers can't create accounts. To give someone their own account:
+1. Supabase Dashboard → **Authentication → Users → Add user → Create new user**: their email, a temporary password, and tick **Auto Confirm User** (no email is sent).
+2. Send them the app link, their email and the temporary password.
+3. They sign in and change it in **Settings → Account → Change password**.
+
+They start with the default categories and tags and see none of your data; you see none of theirs. To remove someone, delete the user in the same screen: all their data is deleted with them.
 
 ---
 

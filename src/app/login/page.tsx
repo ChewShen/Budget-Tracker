@@ -5,8 +5,8 @@ import { Eye, EyeOff } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { GUEST_COOKIE, enterGuest } from "@/lib/guest";
 
-// Email + password only. There is no sign-up: the single user is created in the
-// Supabase dashboard (Authentication -> Users -> Add user).
+// Email + password only. There is no public sign-up: accounts are created in the
+// Supabase dashboard (Authentication -> Users -> Add user); see README > Adding a friend.
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
