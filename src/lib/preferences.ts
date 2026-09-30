@@ -1,3 +1,5 @@
+import { addDays, format, parseISO } from "date-fns";
+
 // Per-device preferences kept in localStorage. Reads fall back to defaults when
 // storage is unavailable (private mode, blocked site data).
 
@@ -39,4 +41,22 @@ export function getLastEntryDate(): string | null {
 
 export function setLastEntryDate(date: string) {
   write(KEYS.LAST_ENTRY_DATE, date);
+}
+
+// Date Add expense opens on. "last" follows you through a catch-up session: it stays on the
+// date you last used until that day has a dinner (or supper) entry, the last meal of a day
+// logged in order, then moves on to the next day. Never later than today.
+export function defaultEntryDate(opts: {
+  mode: DefaultDateMode;
+  today: string; // YYYY-MM-DD
+  lastEntryDate: string | null;
+  eveningTagIds: string[]; // the dinner and supper tags
+  transactions: { date: string; tag_id: string }[];
+}): string {
+  const { mode, today, lastEntryDate, eveningTagIds, transactions } = opts;
+  if (mode !== "last" || !lastEntryDate) return today;
+  const dayDone = transactions.some((t) => t.date === lastEntryDate && eveningTagIds.includes(t.tag_id));
+  if (!dayDone) return lastEntryDate;
+  const next = format(addDays(parseISO(lastEntryDate), 1), "yyyy-MM-dd");
+  return next > today ? today : next;
 }
