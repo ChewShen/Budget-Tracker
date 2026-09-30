@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, ChevronRight, Gauge, Receipt, SlidersHorizontal, Tags, UserRound, Wallet, type LucideIcon } from "lucide-react";
+import { Bell, ChevronRight, Gauge, Landmark, Receipt, SlidersHorizontal, Tags, UserRound, Wallet, type LucideIcon } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
 import { useBudget } from "@/lib/budget-context";
 
@@ -16,6 +16,7 @@ export interface SettingsSection {
 export const SETTINGS_SECTIONS: SettingsSection[] = [
   { href: "/settings/general", label: "General", icon: SlidersHorizontal },
   { href: "/settings/salary", label: "Salary & deductions", icon: Wallet },
+  { href: "/settings/savings", label: "Savings accounts", icon: Landmark },
   { href: "/settings/budgets", label: "Budgets", icon: Gauge },
   { href: "/settings/bills", label: "Monthly bills", icon: Receipt },
   { href: "/settings/reminders", label: "Reminders", icon: Bell },
@@ -25,13 +26,20 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
 
 // One-line summary under each section, so the list shows the current state at a glance.
 function useSummaries(email: string | null): Record<string, string> {
-  const { profile, bills, categories, tags, budgets, mode } = useBudget();
+  const { profile, bills, categories, tags, budgets, savingsAccounts, mode } = useBudget();
+  const activeAccounts = savingsAccounts.filter((a) => !a.archived);
   const budgetTotal = budgets.reduce((sum, b) => sum + b.monthly_limit, 0);
   const autoBills = bills.filter((b) => b.auto_log).length;
   const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
   return {
     "/settings/general": "Default date, theme",
     "/settings/salary": `${formatCurrency(profile.default_gross_salary)} gross`,
+    "/settings/savings": activeAccounts.length
+      ? activeAccounts
+          .sort((a, b) => a.position - b.position)
+          .map((a) => a.name)
+          .join(", ")
+      : "None yet",
     "/settings/budgets": budgets.length
       ? `${plural(budgets.length, "budget")} · ${formatCurrency(budgetTotal)}/month`
       : "None yet",

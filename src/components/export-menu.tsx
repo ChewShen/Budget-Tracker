@@ -4,11 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import { format, parseISO } from "date-fns";
 import { Download, FileJson, FileSpreadsheet, PiggyBank } from "lucide-react";
 import { useBudget } from "@/lib/budget-context";
-import { recordedHistory } from "@/lib/savings";
+import { buildSnapshots } from "@/lib/savings";
 import { CSV, JSON_TYPE, backupJson, download, savingsCsv, transactionsCsv } from "@/lib/export";
 
 export function ExportMenu() {
-  const { transactions, savings, categories, tags, bills, goals, goalContributions, profile, selectedMonth, showToast } =
+  const { transactions, savingsAccounts, savingsBalances, categories, tags, bills, goals, goalContributions, profile, selectedMonth, showToast } =
     useBudget();
   const [isOpen, setIsOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -28,7 +28,7 @@ export function ExportMenu() {
   const today = format(new Date(), "yyyy-MM-dd");
   const monthTxs = transactions.filter((t) => t.date.startsWith(selectedMonth));
   const monthName = format(parseISO(`${selectedMonth}-01`), "MMMM yyyy");
-  const recordedMonths = recordedHistory(savings).length;
+  const recordedMonths = buildSnapshots(savingsBalances).length;
   const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
   const options = [
@@ -58,7 +58,7 @@ export function ExportMenu() {
       icon: PiggyBank,
       disabled: recordedMonths === 0,
       run: () => {
-        download(`budget_savings_${today}.csv`, savingsCsv(savings), CSV);
+        download(`budget_savings_${today}.csv`, savingsCsv(savingsAccounts, savingsBalances), CSV);
         return `Exported ${plural(recordedMonths, "month")} of balances`;
       },
     },
@@ -70,7 +70,17 @@ export function ExportMenu() {
       run: () => {
         download(
           `budget_backup_${today}.json`,
-          backupJson({ profile, categories, tags, bills, goals, goalContributions, transactions, savings }),
+          backupJson({
+            profile,
+            categories,
+            tags,
+            bills,
+            goals,
+            goalContributions,
+            transactions,
+            savingsAccounts,
+            savingsBalances,
+          }),
           JSON_TYPE
         );
         return "Backup downloaded";

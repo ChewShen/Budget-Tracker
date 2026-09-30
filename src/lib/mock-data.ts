@@ -1,4 +1,5 @@
-import { Budget, Category, Goal, GoalContribution, MonthlySavings, RecurringBill, Tag, Transaction } from "./types";
+import { fromLegacySavings } from "./savings";
+import { Budget, Category, Goal, GoalContribution, LegacyMonthlySavings, RecurringBill, Tag, Transaction } from "./types";
 
 // Made-up demo data for guest mode and local-only mode (no Supabase).
 // Generated from today's date (last two full months + this month so far) with a fixed seed,
@@ -164,7 +165,7 @@ function buildTransactions(today: Date): Transaction[] {
 
 // ---- Savings snapshots: the two full months are recorded, this month isn't yet ----
 
-function buildSavings(today: Date): MonthlySavings[] {
+function buildSavings(today: Date): LegacyMonthlySavings[] {
   const month = (back: number) => {
     const d = new Date(today.getFullYear(), today.getMonth() - back, 1);
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-01`;
@@ -223,7 +224,10 @@ function buildGoals(today: Date): { goals: Goal[]; contributions: GoalContributi
 
 const TODAY = new Date();
 export const INITIAL_TRANSACTIONS: Transaction[] = buildTransactions(TODAY);
-export const INITIAL_SAVINGS: MonthlySavings[] = buildSavings(TODAY);
+// Built in the old fixed-column shape and converted, the same way a real account's history is.
+const DEMO_SAVINGS = fromLegacySavings(buildSavings(TODAY));
+export const INITIAL_SAVINGS_ACCOUNTS = DEMO_SAVINGS.accounts;
+export const INITIAL_SAVINGS_BALANCES = DEMO_SAVINGS.balances;
 const DEMO_GOALS = buildGoals(TODAY);
 export const INITIAL_GOALS: Goal[] = DEMO_GOALS.goals;
 export const INITIAL_GOAL_CONTRIBUTIONS: GoalContribution[] = DEMO_GOALS.contributions;

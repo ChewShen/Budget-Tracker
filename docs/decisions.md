@@ -54,6 +54,12 @@ Each entry covers what was chosen, why, and what it costs. For what changed and 
 - **Missing tables are tolerated:** Optional features (bills, goals, budgets, reminders) keep the rest of the app working if their migration hasn't been run yet, and the error message names the file to run.
 - **Trade-off:** No migration tool tracks what has run. For one database, maintained by one person, this is simpler than setting up a migration CLI.
 
+### Savings accounts are rows, not columns
+- **Why:** Savings started as one row per month with fixed columns copied from the spreadsheet (main checking, GXBank + rate, RYT + rate, EPF). That only fit one person's banks. Now each person has their own accounts (`savings_accounts`, liquid or locked) and one balance per account per month (`savings_balances`, with that month's interest rate).
+- **Liquid vs locked:** Locked money (EPF, fixed deposits) counts toward net worth but not the emergency fund or "free money".
+- **Archive, don't delete:** An account with history can't be deleted, because that would rewrite past net worth. Archived accounts aren't asked for in new months but still show in the months they have balances, and in "Since last month" as going to RM 0.
+- **Migration keeps the numbers:** Existing months are copied per column, skipping the all-zero months the Excel import created and columns never used. The same conversion runs in the app for local-mode data and the demo, and the migration's check query compares net worth before and after.
+
 ### Categories and tags are data, not code, and per account
 - **Why:** They started hard-coded from the spreadsheet. They now live in tables that can be edited in Settings, and renaming keeps every past expense linked, because expenses reference ids, not names.
 - **Per account:** With one user they were shared lookup tables. Once friends could have accounts, sharing meant anyone could rename or delete everyone's categories, so each account now owns its own (names unique per account). New accounts get a default set from a database trigger, so they can log an expense straight away.

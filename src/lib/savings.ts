@@ -1,49 +1,104 @@
 import { format, parse, subMonths } from "date-fns";
-import { MonthlySavings } from "./types";
+import { calculateMonthlyInterest } from "./formulas";
+import type { LegacyMonthlySavings, SavingsAccount, SavingsBalance } from "./types";
 
-// Balances are month-end snapshots stored as one row per month (month = YYYY-MM-01).
+// Balances are month-end values per account (savings_balances). A month is "recorded" when it
+// has at least one balance. Pages work with Snapshots: every balance of one month, by account.
 
-export const liquidOf = (s: MonthlySavings) => s.main_checking + s.gx_bank + s.ryt_bank;
-export const netWorthOf = (s: MonthlySavings) => liquidOf(s) + s.epf_locked;
+export interface Snapshot {
+  month: string; // YYYY-MM-01
+  balances: Record<string, { balance: number; rate: number }>; // by account id
+}
 
-// The Excel import created all-zero rows for months that were never filled in,
-// so an all-zero snapshot means "not recorded", not "RM 0".
-export const isRecorded = (s: MonthlySavings | undefined): s is MonthlySavings =>
-  Boolean(s) && netWorthOf(s as MonthlySavings) > 0;
+export function buildSnapshots(balances: SavingsBalance[]): Snapshot[] {
+  const byMonth = new Map<string, Snapshot>();
+  for (const b of balances) {
+    const month = `${b.month.slice(0, 7)}-01`;
+    const snap = byMonth.get(month) ?? { month, balances: {} };
+    snap.balances[b.account_id] = { balance: b.balance, rate: b.rate };
+    byMonth.set(month, snap);
+  }
+  return [...byMonth.values()].sort((a, b) => a.month.localeCompare(b.month));
+}
+
+const round2 = (n: number) => Math.round(n * 100) / 100;
+const isLocked = (accounts: SavingsAccount[], id: string) => accounts.find((a) => a.id === id)?.kind === "locked";
+
+// Money you can use (everything except locked accounts such as EPF).
+export const liquidOf = (s: Snapshot, accounts: SavingsAccount[]) =>
+  round2(Object.entries(s.balances).reduce((sum, [id, b]) => (isLocked(accounts, id) ? sum : sum + b.balance), 0));
+
+export const netWorthOf = (s: Snapshot) => round2(Object.values(s.balances).reduce((sum, b) => sum + b.balance, 0));
+
+// Estimated interest this month on liquid accounts with a rate.
+export const interestOf = (s: Snapshot, accounts: SavingsAccount[]) =>
+  calculateMonthlyInterest(
+    Object.entries(s.balances).filter(([id]) => !isLocked(accounts, id)).map(([, b]) => b),
+    s.month.slice(0, 7)
+  );
+
+// Accounts to list for a month: its own balances plus active accounts, in display order.
+export function accountsFor(accounts: SavingsAccount[], s?: Snapshot): SavingsAccount[] {
+  return accounts
+    .filter((a) => !a.archived || (s && a.id in s.balances))
+    .sort((a, b) => a.position - b.position || a.name.localeCompare(b.name));
+}
 
 export const previousMonth = (month: string) =>
   format(subMonths(parse(`${month}-01`, "yyyy-MM-dd", new Date()), 1), "yyyy-MM");
 
-export function snapshotFor(savings: MonthlySavings[], month: string) {
-  const s = savings.find((row) => row.month.startsWith(month));
-  return isRecorded(s) ? s : undefined;
-}
+export const snapshotFor = (snapshots: Snapshot[], month: string) => snapshots.find((s) => s.month.startsWith(month));
 
 // Latest recorded snapshot strictly before `month`.
-export function latestBefore(savings: MonthlySavings[], month: string) {
-  return savings
-    .filter((row) => row.month.slice(0, 7) < month && isRecorded(row))
-    .sort((a, b) => b.month.localeCompare(a.month))[0];
+export const latestBefore = (snapshots: Snapshot[], month: string) =>
+  [...snapshots].reverse().find((s) => s.month.slice(0, 7) < month);
+
+export interface DraftLine {
+  account: SavingsAccount;
+  balance: number;
+  rate: number;
+  previous?: number; // balance in the latest earlier record, if it had this account
 }
 
-// Starting values when recording a month: its own snapshot, else carried forward
-// from the latest earlier one (balances and rates), else defaults.
-export function draftFor(savings: MonthlySavings[], month: string): MonthlySavings {
-  const base = snapshotFor(savings, month) || latestBefore(savings, month);
+// Starting values when recording a month, per account: its own balance, else carried forward
+// from the latest earlier record that has the account (balance and rate), else 0.
+export function draftFor(accounts: SavingsAccount[], snapshots: Snapshot[], month: string): DraftLine[] {
+  const own = snapshotFor(snapshots, month);
+  const earlier = snapshots.filter((s) => s.month.slice(0, 7) < month).reverse();
+  return accountsFor(accounts, own).map((account) => {
+    const before = earlier.find((s) => account.id in s.balances)?.balances[account.id];
+    const base = own?.balances[account.id] ?? before;
+    return { account, balance: base?.balance ?? 0, rate: base?.rate ?? 0, previous: before?.balance };
+  });
+}
+
+// Converts the old fixed columns (main checking, GXBank, RYT, EPF) into accounts and balances.
+// Mirrors scripts/migrations/2026-09-30_savings_accounts.sql: all-zero months were never
+// recorded (an old import artifact) and are skipped, as are accounts that were always 0.
+export function fromLegacySavings(rows: LegacyMonthlySavings[]): { accounts: SavingsAccount[]; balances: SavingsBalance[] } {
+  const recorded = rows.filter(
+    (r) => (r.main_checking || 0) + (r.gx_bank || 0) + (r.ryt_bank || 0) + (r.epf_locked || 0) > 0
+  );
+  const columns = [
+    { id: "acct-main", name: "Main checking", kind: "liquid", value: (r: LegacyMonthlySavings) => r.main_checking, rate: () => 0 },
+    { id: "acct-gx", name: "GXBank", kind: "liquid", value: (r: LegacyMonthlySavings) => r.gx_bank, rate: (r: LegacyMonthlySavings) => r.gx_rate },
+    { id: "acct-ryt", name: "RYT / Rize", kind: "liquid", value: (r: LegacyMonthlySavings) => r.ryt_bank, rate: (r: LegacyMonthlySavings) => r.ryt_rate },
+    { id: "acct-epf", name: "EPF & locked", kind: "locked", value: (r: LegacyMonthlySavings) => r.epf_locked, rate: () => 0 },
+  ] as const;
+  const used = columns.filter((c) => recorded.some((r) => (c.value(r) || 0) > 0));
   return {
-    month: `${month}-01`,
-    main_checking: base?.main_checking ?? 0,
-    gx_bank: base?.gx_bank ?? 0,
-    gx_rate: base?.gx_rate ?? 0.0355,
-    ryt_bank: base?.ryt_bank ?? 0,
-    ryt_rate: base?.ryt_rate ?? 0,
-    epf_locked: base?.epf_locked ?? 0,
+    accounts: used.map((c, i) => ({ id: c.id, name: c.name, kind: c.kind, position: i, archived: false })),
+    balances: recorded.flatMap((r) =>
+      used.map((c) => ({
+        id: `bal-${c.id}-${r.month.slice(0, 7)}`,
+        account_id: c.id,
+        month: `${r.month.slice(0, 7)}-01`,
+        balance: Number(c.value(r) || 0),
+        rate: Number(c.rate(r) || 0),
+      }))
+    ),
   };
 }
-
-// Recorded snapshots in chronological order, for the trend chart.
-export const recordedHistory = (savings: MonthlySavings[]) =>
-  savings.filter(isRecorded).sort((a, b) => a.month.localeCompare(b.month));
 
 // ---- Emergency fund ----
 
@@ -73,17 +128,21 @@ export interface SavingPace {
 // How fast liquid money grows: measured across recorded months when there are at least two,
 // otherwise estimated as take-home pay minus average spending.
 export function savingPace(
-  savings: MonthlySavings[],
+  snapshots: Snapshot[],
+  accounts: SavingsAccount[],
   month: string,
   takeHome: number,
   averageSpend: number
 ): SavingPace {
-  const history = recordedHistory(savings).filter((s) => s.month.slice(0, 7) <= month);
+  const history = snapshots.filter((s) => s.month.slice(0, 7) <= month);
   if (history.length >= 2) {
     const first = history[0];
     const last = history[history.length - 1];
     const span = monthIndex(last.month.slice(0, 7)) - monthIndex(first.month.slice(0, 7));
-    return { perMonth: Math.round(((liquidOf(last) - liquidOf(first)) / span) * 100) / 100, basis: "balances" };
+    return {
+      perMonth: Math.round(((liquidOf(last, accounts) - liquidOf(first, accounts)) / span) * 100) / 100,
+      basis: "balances",
+    };
   }
   return { perMonth: Math.round((takeHome - averageSpend) * 100) / 100, basis: "budget" };
 }

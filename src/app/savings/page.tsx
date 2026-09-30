@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowDownRight, ArrowUpRight, Pencil, Plus } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, Lock, Pencil, Plus } from "lucide-react";
 import { endOfMonth, format, parse } from "date-fns";
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 import { useBudget } from "@/lib/budget-context";
@@ -13,31 +13,22 @@ import { earmarkedTotal } from "@/lib/goals";
 import { AccountChanges } from "@/components/account-changes";
 import { SavingsRateTrend } from "@/components/savings-rate-trend";
 import { formatCurrency } from "@/lib/utils";
+import { calculateSalaryMetrics, calculateUntrackedCash } from "@/lib/formulas";
 import {
-  calculateDigitalBankInterest,
-  calculateSalaryMetrics,
-  calculateUntrackedCash,
-} from "@/lib/formulas";
-import {
-  draftFor,
+  accountsFor,
   averageMonthlySpend,
+  buildSnapshots,
+  draftFor,
+  interestOf,
   latestBefore,
   liquidOf,
   netWorthOf,
   previousMonth,
   reachMonth,
-  recordedHistory,
   savingPace,
   snapshotFor,
 } from "@/lib/savings";
-import { MonthlySavings } from "@/lib/types";
-
-const ACCOUNT_KEYS = [
-  { key: "main_checking", label: "Main checking" },
-  { key: "gx_bank", label: "GXBank" },
-  { key: "ryt_bank", label: "RYT / Rize" },
-  { key: "epf_locked", label: "EPF & locked" },
-] as const;
+import type { SavingsBalance } from "@/lib/types";
 
 function TrendTooltip({
   active,
@@ -58,11 +49,12 @@ function TrendTooltip({
 
 export default function SavingsPage() {
   const {
-    savings,
+    savingsAccounts,
+    savingsBalances,
+    saveBalances,
     transactions,
     selectedMonth,
     setSelectedMonth,
-    updateSavings,
     profile,
     showToast,
     emergencyMonths,
@@ -77,10 +69,12 @@ export default function SavingsPage() {
   const monthName = format(monthDate, "MMMM");
   const isFutureMonth = selectedMonth > format(new Date(), "yyyy-MM");
 
-  const current = snapshotFor(savings, selectedMonth);
-  const lastRecorded = latestBefore(savings, selectedMonth);
+  const snapshots = buildSnapshots(savingsBalances);
+  const current = snapshotFor(snapshots, selectedMonth);
+  const lastRecorded = latestBefore(snapshots, selectedMonth);
   // Growth and untracked cash only compare adjacent months; a gap would mix several months of saving.
-  const prevAdjacent = snapshotFor(savings, previousMonth(selectedMonth));
+  const prevAdjacent = snapshotFor(snapshots, previousMonth(selectedMonth));
+  const liquid = (s: typeof current) => (s ? liquidOf(s, savingsAccounts) : 0);
 
   // Cash flow for the month: what salary minus spending says you should have saved.
   const totalSpend = transactions
@@ -90,22 +84,20 @@ export default function SavingsPage() {
 
   // Emergency fund: liquid money vs average spending of completed months.
   const spend = averageMonthlySpend(transactions, selectedMonth, format(new Date(), "yyyy-MM"));
-  const pace = savingPace(savings, selectedMonth, netSalary, spend.average);
+  const pace = savingPace(snapshots, savingsAccounts, selectedMonth, netSalary, spend.average);
   // Money set aside for goals is today's figure, so it only applies to the latest recorded balances.
-  const isLatestRecord = Boolean(current) && recordedHistory(savings).at(-1)?.month === current?.month;
+  const isLatestRecord = Boolean(current) && snapshots.at(-1)?.month === current?.month;
   const earmarked = isLatestRecord ? earmarkedTotal(goals, goalContributions) : 0;
-  const freeLiquid = current ? Math.max(0, liquidOf(current) - earmarked) : 0;
+  const freeLiquid = current ? Math.max(0, liquid(current) - earmarked) : 0;
   const emergencyTarget = emergencyMonths * spend.average;
   const reachBy = current ? reachMonth(selectedMonth, emergencyTarget - freeLiquid, pace.perMonth) : null;
 
-  const growth = current && prevAdjacent ? liquidOf(current) - liquidOf(prevAdjacent) : null;
+  const growth = current && prevAdjacent ? liquid(current) - liquid(prevAdjacent) : null;
   const untracked =
-    current && prevAdjacent ? calculateUntrackedCash(liquidOf(current), liquidOf(prevAdjacent), netCashSaved) : null;
-  const estInterest = current
-    ? calculateDigitalBankInterest(current.gx_bank, current.gx_rate, current.ryt_bank, current.ryt_rate, selectedMonth)
-    : 0;
+    current && prevAdjacent ? calculateUntrackedCash(liquid(current), liquid(prevAdjacent), netCashSaved) : null;
+  const estInterest = current ? interestOf(current, savingsAccounts) : 0;
 
-  const history = recordedHistory(savings).map((s) => ({
+  const history = snapshots.map((s) => ({
     month: s.month.slice(0, 7),
     label: format(parse(s.month, "yyyy-MM-dd", new Date()), "MMM yyyy"),
     short: format(parse(s.month, "yyyy-MM-dd", new Date()), "MMM"),
@@ -124,11 +116,11 @@ export default function SavingsPage() {
       return { month: m, rate: metrics.savingsRate, saved: metrics.netCashSaved, inProgress: m === currentMonth };
     });
 
-  const handleSave = async (snapshot: MonthlySavings) => {
+  const handleSave = async (lines: Pick<SavingsBalance, "account_id" | "balance" | "rate">[]) => {
     setIsSheetOpen(false);
-    await updateSavings(snapshot);
-    showToast({ tone: "default", message: `Balances saved for ${monthName}` });
+    if (await saveBalances(selectedMonth, lines)) showToast({ tone: "default", message: `Balances saved for ${monthName}` });
   };
+  const hasAccounts = savingsAccounts.some((a) => !a.archived);
 
   const netWorth = current ? netWorthOf(current) : 0;
 
@@ -170,20 +162,44 @@ export default function SavingsPage() {
           )}
 
           <ul className="mt-6 divide-y divide-border/70 border-t">
-            {ACCOUNT_KEYS.map(({ key, label }) => {
-              const value = current[key];
-              const share = netWorth > 0 ? (value / netWorth) * 100 : 0;
-              return (
-                <li key={key} className="flex items-center gap-3 py-2.5 text-sm">
-                  <span className="w-28 shrink-0 sm:w-32">{label}</span>
-                  <div className="h-1.5 flex-1 rounded-full bg-secondary">
-                    <div className="h-full rounded-full bg-primary" style={{ width: `${share}%` }} />
-                  </div>
-                  <span className="w-28 shrink-0 text-right tabular-nums">{formatCurrency(value)}</span>
-                </li>
-              );
-            })}
+            {accountsFor(savingsAccounts, current)
+              .filter((a) => a.id in current.balances)
+              .map((account) => {
+                const value = current.balances[account.id].balance;
+                const share = netWorth > 0 ? (value / netWorth) * 100 : 0;
+                return (
+                  <li key={account.id} className="flex items-center gap-3 py-2.5 text-sm">
+                    <span className="flex w-28 shrink-0 items-center gap-1 truncate sm:w-36" title={account.name}>
+                      <span className="truncate">{account.name}</span>
+                      {account.kind === "locked" && (
+                        <Lock className="h-3 w-3 shrink-0 text-muted-foreground" aria-label="Locked, not counted as liquid" />
+                      )}
+                    </span>
+                    <div className="h-1.5 flex-1 rounded-full bg-secondary">
+                      <div className="h-full rounded-full bg-primary" style={{ width: `${share}%` }} />
+                    </div>
+                    <span className="w-28 shrink-0 text-right tabular-nums">{formatCurrency(value)}</span>
+                  </li>
+                );
+              })}
           </ul>
+        </section>
+      ) : !hasAccounts ? (
+        /* No accounts yet (e.g. a new account holder) */
+        <section className="card p-5 sm:p-6">
+          <div className="eyebrow">Net worth</div>
+          <div className="mt-1.5 text-2xl font-semibold tracking-tight text-muted-foreground">No accounts yet</div>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Add the accounts you want to track (bank accounts, e-wallets, EPF, investments), then record their
+            balances at the end of each month.
+          </p>
+          <Link
+            href="/settings/savings"
+            className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition hover:brightness-95 active:scale-[0.97]"
+          >
+            <Plus className="h-4 w-4" strokeWidth={2.5} />
+            Add accounts
+          </Link>
         </section>
       ) : (
         /* Month not recorded yet */
@@ -226,6 +242,7 @@ export default function SavingsPage() {
 
       {current && lastRecorded && (
         <AccountChanges
+          accounts={[...savingsAccounts].sort((a, b) => a.position - b.position)}
           current={current}
           previous={lastRecorded}
           previousLabel={format(parse(lastRecorded.month, "yyyy-MM-dd", new Date()), "MMMM")}
@@ -284,7 +301,7 @@ export default function SavingsPage() {
 
           {estInterest > 0 && (
             <div className="mt-4 flex items-center justify-between border-t pt-3 text-sm">
-              <span className="text-muted-foreground">Est. interest for {monthName} (GXBank + RYT)</span>
+              <span className="text-muted-foreground">Est. interest for {monthName}</span>
               <span className="font-medium tabular-nums text-success">+{formatCurrency(estInterest)}</span>
             </div>
           )}
@@ -340,8 +357,7 @@ export default function SavingsPage() {
       <BalancesSheet
         isOpen={isSheetOpen}
         monthLabel={monthEndLabel}
-        draft={draftFor(savings, selectedMonth)}
-        previous={lastRecorded}
+        lines={draftFor(savingsAccounts, snapshots, selectedMonth)}
         previousLabel={lastRecorded ? format(parse(lastRecorded.month, "yyyy-MM-dd", new Date()), "MMM") : undefined}
         onClose={() => setIsSheetOpen(false)}
         onSave={handleSave}
