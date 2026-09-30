@@ -120,8 +120,8 @@ const STORAGE_KEYS = {
 function describeDbError(error: { code?: string; message?: string }, what: string): string {
   if (error.code === "23505") return `${what} already exists.`;
   if (error.code === "23503") return `${what} is still used by expenses.`;
-  if (error.code === "42501")
-    return "Not allowed yet: run scripts/migrations/2026-09-28_manage_categories_tags.sql in Supabase.";
+  // Row-level security said no: usually a migration in scripts/migrations/ hasn't been run yet.
+  if (error.code === "42501") return `Not allowed to save ${what.toLowerCase()}. Run the latest migrations in Supabase.`;
   return `Couldn't save ${what.toLowerCase()}.`;
 }
 
