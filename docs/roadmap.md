@@ -14,7 +14,6 @@ When one is picked up, move it to `docs/changelog.md` under the version that shi
 
 ## Budgeting
 
-- **Budgets per category**: Monthly limits (e.g. Food RM 800) with progress on Overview, a warning near the limit and a "RM 22/day left" allowance.
 - **Other income**: Log bonuses and side income so the savings rate and untracked-cash check stay accurate (today only the fixed salary counts).
 - **Salary history**: Salary changes apply to all months today; keep a dated history so past savings rates stay correct.
 
