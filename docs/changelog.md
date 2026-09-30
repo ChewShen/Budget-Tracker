@@ -15,6 +15,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.14.0] - 2026-09-30
+
+### Added
+- **Budgets**: a monthly limit per category in Settings → Budgets (with last month's spend as a hint). Overview shows each budget's spend, pace ("on pace for RM 430"), what's left per day, and flags budgets at risk or over; the worst one leads the insights.
+- **Reminders** (phone notifications, around 8pm Malaysia time): bills due tomorrow or overdue, goal vouchers expiring in 3 days or 1 day, budgets at 80% or over, and an optional "nothing logged today" nudge. Each is sent once. Settings → Reminders turns them on per device, picks which ones you get, sends a test, and previews what would go out tonight. On iPhone it works from the Home Screen app (iOS 16.4+).
+- Tapping the "nothing logged today" reminder opens Add expense.
+- `docs/decisions.md`: why the stack and main design choices were made.
+
+### Changed
+- Signing out stops reminders on that device.
+
+### Database
+- New migration `scripts/migrations/2026-09-29_budgets.sql`: `budgets` table (one limit per category) with owner-only access.
+- New migration `scripts/migrations/2026-09-29_reminders.sql`: `push_subscriptions`, `reminder_settings` and `reminder_log` with owner-only access (the log is written by the sender only).
+
+### Deployment
+- Daily Vercel Cron job (`vercel.json`, 12:00 UTC) calling `/api/reminders`. Needs `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `SUPABASE_SERVICE_ROLE_KEY` and `CRON_SECRET` (see README → Reminders).
+
+---
+
 ## [0.13.1] - 2026-09-29
 
 ### Fixed

@@ -14,6 +14,8 @@ export const maxDuration = 60;
 async function loadData(db: SupabaseClient, userId: string, today: string): Promise<ReminderData | null> {
   const monthStart = `${today.slice(0, 7)}-01`;
   const [cats, tgs, txs, bls, bgs, gls] = await Promise.all([
+    // Not filtered by user: they're only looked up by id from this user's own bills and budgets,
+    // and this also works on databases from before the multi-user migration (no user_id column).
     db.from("categories").select("id, name"),
     db.from("tags").select("id, category_id, name"),
     // From this month's start: covers budgets, this month's bills and a bill due tomorrow in next month.

@@ -23,15 +23,25 @@ END $$;
 
 -- 3. Carry over the bills the app used to hard-code, for the owner (the user who owns the expenses).
 --    Only adds ones that are missing; remove any you don't want in Settings.
-INSERT INTO public.recurring_sentinel (user_id, tag_id, is_active)
-SELECT owner.user_id, t.id, true
-FROM public.tags t
-CROSS JOIN (
-  SELECT user_id FROM public.transactions WHERE user_id IS NOT NULL LIMIT 1
-) owner
-WHERE t.name IN ('Netflix', 'iCloud', 'Youtube Premium', 'Youtube Membership',
-                 'Cuckoo', 'Electric', 'Water', 'Season Parking')
-ON CONFLICT (user_id, tag_id) DO NOTHING;
+--    Skipped once 2026-09-30_multi_user.sql has run (tags then belong to accounts and
+--    matching them by name would pick up other people's tags).
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns
+             WHERE table_schema = 'public' AND table_name = 'tags' AND column_name = 'user_id') THEN
+    RETURN;
+  END IF;
+
+  INSERT INTO public.recurring_sentinel (user_id, tag_id, is_active)
+  SELECT owner.user_id, t.id, true
+  FROM public.tags t
+  CROSS JOIN (
+    SELECT user_id FROM public.transactions WHERE user_id IS NOT NULL LIMIT 1
+  ) owner
+  WHERE t.name IN ('Netflix', 'iCloud', 'Youtube Premium', 'Youtube Membership',
+                   'Cuckoo', 'Electric', 'Water', 'Season Parking')
+  ON CONFLICT (user_id, tag_id) DO NOTHING;
+END $$;
 
 -- 4. Check: your bills.
 SELECT t.name AS bill, r.expected_amount, r.due_day, r.is_active

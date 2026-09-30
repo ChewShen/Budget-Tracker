@@ -7,9 +7,19 @@
 --   2. Replace you@example.com below with that same email.
 --   3. Paste this whole file into the SQL Editor and click Run.
 --
--- Safe to re-run. WARNING: do not re-run scripts/seed_data.sql afterwards;
+-- Safe to re-run until the multi-user migration has run (it then refuses). WARNING: do not re-run scripts/seed_data.sql afterwards;
 -- its STEP 2 re-creates the old "allow everyone" policies.
 -- ========================================================
+
+-- 0. Only for first-time setup. After scripts/migrations/2026-09-30_multi_user.sql it would
+--    re-open categories and tags to every account, so it stops here instead.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns
+             WHERE table_schema = 'public' AND table_name = 'categories' AND column_name = 'user_id') THEN
+    RAISE EXCEPTION 'Already set up for multiple users. To reset policies, re-run scripts/migrations/2026-09-30_multi_user.sql instead.';
+  END IF;
+END $$;
 
 DO $$
 DECLARE
