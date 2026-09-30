@@ -27,7 +27,8 @@ When one is picked up, move it to `docs/changelog.md` under the version that shi
 
 ## Robustness
 
-- **Automated tests**: Turn the ad-hoc browser checks into Playwright tests in CI, and add unit tests for `src/lib/analytics.ts`, `savings.ts` and `bills.ts`.
+- **Load expenses in pages**: Supabase returns at most 1,000 rows per request; past about 1,000 expenses the oldest would silently stop loading. Page the load (or raise the limit) before that.
+- **Automated tests**: Turn the ad-hoc browser checks into Playwright tests in CI, add unit tests for `src/lib/analytics.ts`, `savings.ts`, `bills.ts` and `reminders.ts`, and commit the PGlite database tests (RLS per user, migrations replayed in order).
 - **Recharts v3**: v2 is deprecated.
 
 ## Data housekeeping
@@ -35,4 +36,4 @@ When one is picked up, move it to `docs/changelog.md` under the version that shi
 - **Keep real data out of git**: `*.xlsm`, `*.xlsx`, `scripts/seed_data.sql` and `private/` are gitignored, and local git hooks (pre-commit, commit-msg, pre-push, using a gitignored list in `private/guard/`) block commits and pushes containing real personal data. Hooks live only in `.git/hooks`: when cloning elsewhere, copy `private/` and reinstall them. The earlier private repository (with the original, unscrubbed history) is archived and no longer used.
 
 - Check August 2026 balances from the Excel import (Main checking RM 0, EPF RM 10 look wrong).
-- Optionally delete the all-zero savings rows the import created for Sep–Dec 2026 (the app already treats them as "not recorded").
+- Once the new savings accounts look right, `monthly_savings` (kept as a backup by `2026-09-30_savings_accounts.sql`) can be dropped.

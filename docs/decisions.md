@@ -25,7 +25,8 @@ Each entry covers what was chosen, why, and what it costs. For what changed and 
 - **lucide-react** for icons: consistent stroke style, and only the icons used get bundled. Category icons are stored as keys (`categories.icon`) so they survive renames.
 
 ### Supabase (Postgres + Auth)
-- **Why:** A real relational database with auth, row-level security and scheduled jobs (`pg_cron`) on a free tier, with no backend server to maintain. The spreadsheet this app replaced was already relational (transactions → categories → tags).
+- **Why:** A real relational database with auth, row-level security, triggers and scheduled jobs (`pg_cron`) on a free tier, with no backend server to maintain. The spreadsheet this app replaced was already relational (transactions → categories → tags).
+- **Logic that must always happen lives in the database:** New accounts get their profile and default categories from a trigger on `auth.users` (`seed_new_user`), and due bills are added by `pg_cron`. Neither depends on the app being open or on client code being right.
 - **Trade-off:** Security depends on RLS policies being right (see [Security](#3-security--privacy)), and schema changes are hand-written SQL migrations run in the SQL Editor.
 
 ### Vercel hosting
@@ -39,6 +40,7 @@ Each entry covers what was chosen, why, and what it costs. For what changed and 
 ### One client-side store with optimistic updates (`src/lib/budget-context.tsx`)
 - **Why:** One person's data is small (thousands of rows), so the app loads it all once and every page computes from memory. Adding, editing and deleting update the screen immediately, then save in the background. If a save fails, the change rolls back and the toast offers **Retry**. Deletes have a 5-second **Undo**.
 - **Trade-off:** The context file is large, and it would need paging or server-side queries if the data grew a lot.
+- **Known limit:** Supabase returns at most 1,000 rows per request by default, and expenses are loaded in one request. Past about 1,000 expenses the oldest would silently stop loading; paging the load is on the roadmap.
 
 ### Three data modes: cloud, local, guest
 - **Cloud:** Supabase configured and signed in. The real app.
@@ -51,7 +53,9 @@ Each entry covers what was chosen, why, and what it costs. For what changed and 
 
 ### Migrations as dated, re-runnable SQL files
 - **Why:** `scripts/migrations/YYYY-MM-DD_name.sql`, run once in the Supabase SQL Editor in date order. Every file uses `IF NOT EXISTS` / `DROP … IF EXISTS`, so running one twice is harmless, and each ends with a check query that shows it worked.
-- **Missing tables are tolerated:** Optional features (bills, goals, budgets, reminders) keep the rest of the app working if their migration hasn't been run yet, and the error message names the file to run.
+- **Missing tables are tolerated:** Optional features (bills, goals, budgets, reminders, savings accounts) keep the rest of the app working if their migration hasn't been run yet, and the error message names the file to run. Before the savings-accounts migration, the old balances are shown read-only.
+- **Old scripts can't undo new ones:** Once the multi-user migration has run, `secure_rls.sql` refuses to run and the older category and bill migrations skip the steps that would re-open or cross accounts, because "safe to re-run" has to stay true for every file.
+- **Tested against real Postgres first:** Each migration is replayed on a throwaway Postgres (PGlite) with the full migration history and checked as different users before it's shipped. That caught a bug where the savings migration would have created no accounts (`EXECUTE` doesn't set `FOUND` in PL/pgSQL). These tests aren't in CI yet; that's on the roadmap.
 - **Trade-off:** No migration tool tracks what has run. For one database, maintained by one person, this is simpler than setting up a migration CLI.
 
 ### Savings accounts are rows, not columns
@@ -83,7 +87,8 @@ Each entry covers what was chosen, why, and what it costs. For what changed and 
 - **Guards:** The Excel file, seed SQL and `private/` are gitignored. Local git hooks (pre-commit, commit-msg, pre-push) block commits and pushes that contain markers of real data. The hooks live in `.git/hooks` and aren't committed, so they have to be reinstalled on a new clone.
 
 ### Server secrets stay server-side
-- `SUPABASE_SERVICE_ROLE_KEY` (bypasses RLS), `VAPID_PRIVATE_KEY` and `CRON_SECRET` are only read in `src/lib/push-server.ts` and the API routes, and are never `NEXT_PUBLIC_`. Because the service role bypasses RLS, every query in the reminder job filters by `user_id` explicitly.
+- `SUPABASE_SERVICE_ROLE_KEY` (bypasses RLS), `VAPID_PRIVATE_KEY` and `CRON_SECRET` are only read in `src/lib/push-server.ts` and the API routes, and are never `NEXT_PUBLIC_`. Because the service role bypasses RLS, the reminder job filters every query for a person's data (expenses, bills, budgets, goals, devices) by `user_id`. Categories and tags are the exception: they're only looked up by id from that person's own rows, which also keeps the job working on databases from before the multi-user migration.
+- **`NEXT_PUBLIC_` values are baked in at build time:** The public VAPID key is copied into the JavaScript when the app is built, so changing it needs a redeploy (or a dev-server restart locally), unlike server-only variables.
 
 ---
 
@@ -126,6 +131,9 @@ Each entry covers what was chosen, why, and what it costs. For what changed and 
 
 ### Semantic versioning, changelog and annotated tags
 - `npm version <patch|minor> --no-git-tag-version`, a changelog entry, a `chore(release)` commit and an annotated `vX.Y.Z` tag. See [`version-bump.md`](version-bump.md).
+
+### Changes are verified the way they'll be used
+- Besides type-check and lint: UI changes are clicked through in headless Chrome (desktop and phone widths, via the DevTools protocol), server routes are run against an in-memory fake of Supabase, and push notifications were checked end to end through Google's push service. Bugs found this way are fixed before committing and mentioned in the commit.
 
 ### CI runs only what Vercel doesn't
 - **Why:** Vercel already builds every push. GitHub Actions (`.github/workflows/ci.yml`) adds type-check, lint and the formula test on PRs to `dev` and `main`.

@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Multiple accounts**: friends can have their own account with completely separate data. New accounts start with a default set of categories and tags. Accounts are added in the Supabase dashboard (see README → Adding a friend).
+- **Change password** in Settings → Account.
+- **Your own savings accounts** (Settings → Savings accounts): add, rename, archive, and mark each as liquid or locked; any liquid account can have an interest rate. Replaces the fixed Main checking / GXBank / RYT / EPF fields.
+- A **Supper** tag in the default set, suggested from 10pm to 5am.
+
+### Changed
+- The Food & dining card and the tag Add expense suggests for the time of day are found by a mark (★ in Settings → Categories & tags) instead of by name, so they can be renamed freely. Deleting a starred one asks first.
+- Categories and tags belong to each account: names only need to be unique within your own.
+- Savings export: one column per account. The JSON backup is now schema 2 (savings as accounts and balances).
+
+### Database
+- `scripts/migrations/2026-09-30_multi_user.sql`: owners for categories and tags, owner-only policies, reference checks, and a trigger that sets up new accounts.
+- `scripts/migrations/2026-09-30_roles.sql`: food category and meal tag marks.
+- `scripts/migrations/2026-09-30_savings_accounts.sql`: `savings_accounts` and `savings_balances`, with existing balances copied over (`monthly_savings` kept as a backup).
+- `secure_rls.sql` refuses to run after the multi-user migration, and older migrations no longer undo it when re-run.
+
 ### Planned
 - See [`docs/roadmap.md`](roadmap.md) for the idea backlog.
 - [ ] Configure custom domain (optional).
