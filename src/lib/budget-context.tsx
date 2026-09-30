@@ -2,12 +2,25 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { format } from "date-fns";
-import { Budget, Category, Goal, GoalContribution, Tag, Transaction, MonthlySavings, RecurringBill, UserSalaryProfile } from "./types";
+import {
+  Budget,
+  Category,
+  Goal,
+  GoalContribution,
+  LegacyMonthlySavings,
+  RecurringBill,
+  SavingsAccount,
+  SavingsBalance,
+  Tag,
+  Transaction,
+  UserSalaryProfile,
+} from "./types";
 import {
   INITIAL_CATEGORIES,
   INITIAL_TAGS,
   INITIAL_TRANSACTIONS,
-  INITIAL_SAVINGS,
+  INITIAL_SAVINGS_ACCOUNTS,
+  INITIAL_SAVINGS_BALANCES,
   INITIAL_BILLS,
   INITIAL_GOALS,
   INITIAL_GOAL_CONTRIBUTIONS,
@@ -18,6 +31,7 @@ import { createClient } from "./supabase/client";
 import { isSupabaseConfigured } from "./supabase/config";
 import { exitGuest, isGuestSession } from "./guest";
 import { dueAutoBills } from "./bills";
+import { fromLegacySavings } from "./savings";
 
 export type NewTransaction = {
   amount: number;
@@ -59,13 +73,19 @@ interface BudgetContextType {
   categories: Category[];
   tags: Tag[];
   transactions: Transaction[];
-  savings: MonthlySavings[];
+  savingsAccounts: SavingsAccount[];
+  savingsBalances: SavingsBalance[];
   selectedMonth: string; // YYYY-MM
   setSelectedMonth: (month: string) => void;
   addTransaction: (tx: NewTransaction) => Promise<void>;
   updateTransaction: (id: string, tx: NewTransaction) => Promise<void>;
   deleteTransaction: (id: string) => Promise<void>;
-  updateSavings: (savings: MonthlySavings) => Promise<void>;
+  // Month-end balances for one month (YYYY-MM), one line per account.
+  saveBalances: (month: string, lines: Pick<SavingsBalance, "account_id" | "balance" | "rate">[]) => Promise<boolean>;
+  addSavingsAccount: (name: string, kind: SavingsAccount["kind"]) => Promise<SavingsAccount | null>;
+  updateSavingsAccount: (id: string, changes: Partial<Pick<SavingsAccount, "name" | "kind" | "archived">>) => Promise<boolean>;
+  // Only for accounts with no balances; ones with history are archived instead.
+  deleteSavingsAccount: (id: string) => Promise<boolean>;
   profile: UserSalaryProfile;
   updateProfile: (profile: UserSalaryProfile) => Promise<void>;
   emergencyMonths: number; // emergency fund goal, in months of spending
@@ -105,7 +125,9 @@ const BudgetContext = createContext<BudgetContextType | undefined>(undefined);
 
 const STORAGE_KEYS = {
   TRANSACTIONS: "budget_tracker_transactions",
-  SAVINGS: "budget_tracker_savings",
+  SAVINGS: "budget_tracker_savings", // old fixed-column format, converted on load
+  SAVINGS_ACCOUNTS: "budget_tracker_savings_accounts",
+  SAVINGS_BALANCES: "budget_tracker_savings_balances",
   PROFILE: "budget_tracker_profile",
   CATEGORIES: "budget_tracker_categories",
   TAGS: "budget_tracker_tags",
@@ -115,6 +137,9 @@ const STORAGE_KEYS = {
   BUDGETS: "budget_tracker_budgets",
   GOAL_CONTRIBUTIONS: "budget_tracker_goal_contributions",
 };
+
+// Postgres / PostgREST codes for "table doesn't exist yet" (a migration hasn't been run).
+const MISSING_TABLE = ["42P01", "PGRST205"];
 
 // Turns a Supabase/Postgres error into a message the user can act on.
 function describeDbError(error: { code?: string; message?: string }, what: string): string {
@@ -136,7 +161,14 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
   const [transactions, setTransactions] = useState<Transaction[]>(
     isSupabaseConfigured ? [] : INITIAL_TRANSACTIONS
   );
-  const [savings, setSavings] = useState<MonthlySavings[]>(isSupabaseConfigured ? [] : INITIAL_SAVINGS);
+  const [savingsAccounts, setSavingsAccounts] = useState<SavingsAccount[]>(
+    isSupabaseConfigured ? [] : INITIAL_SAVINGS_ACCOUNTS
+  );
+  const [savingsBalances, setSavingsBalances] = useState<SavingsBalance[]>(
+    isSupabaseConfigured ? [] : INITIAL_SAVINGS_BALANCES
+  );
+  // Cloud database without 2026-09-30_savings_accounts.sql: old balances are shown, saving needs the migration.
+  const [savingsNeedsMigration, setSavingsNeedsMigration] = useState(false);
   // Real month is set on mount; using new Date() here would bake the build date into the prerendered HTML.
   const [selectedMonth, setSelectedMonth] = useState<string>("2026-01");
   const [isSyncedWithSupabase, setIsSyncedWithSupabase] = useState(false);
@@ -175,7 +207,8 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
       setCategories(INITIAL_CATEGORIES);
       setTags(INITIAL_TAGS);
       setTransactions(INITIAL_TRANSACTIONS);
-      setSavings(INITIAL_SAVINGS);
+      setSavingsAccounts(INITIAL_SAVINGS_ACCOUNTS);
+      setSavingsBalances(INITIAL_SAVINGS_BALANCES);
       setBills(INITIAL_BILLS);
       setGoals(INITIAL_GOALS);
       setGoalContributions(INITIAL_GOAL_CONTRIBUTIONS);
@@ -189,8 +222,17 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
       try {
         const savedTx = localStorage.getItem(STORAGE_KEYS.TRANSACTIONS);
         if (savedTx) setTransactions(JSON.parse(savedTx));
-        const savedSv = localStorage.getItem(STORAGE_KEYS.SAVINGS);
-        if (savedSv) setSavings(JSON.parse(savedSv));
+        const savedAccounts = localStorage.getItem(STORAGE_KEYS.SAVINGS_ACCOUNTS);
+        const savedBalances = localStorage.getItem(STORAGE_KEYS.SAVINGS_BALANCES);
+        const legacySavings = localStorage.getItem(STORAGE_KEYS.SAVINGS);
+        if (savedAccounts) {
+          setSavingsAccounts(JSON.parse(savedAccounts));
+          setSavingsBalances(savedBalances ? JSON.parse(savedBalances) : []);
+        } else if (legacySavings) {
+          const converted = fromLegacySavings(JSON.parse(legacySavings));
+          setSavingsAccounts(converted.accounts);
+          setSavingsBalances(converted.balances);
+        }
         const savedCats = localStorage.getItem(STORAGE_KEYS.CATEGORIES);
         if (savedCats) setCategories(JSON.parse(savedCats));
         const savedTags = localStorage.getItem(STORAGE_KEYS.TAGS);
@@ -218,6 +260,8 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
     try {
       localStorage.removeItem(STORAGE_KEYS.TRANSACTIONS);
       localStorage.removeItem(STORAGE_KEYS.SAVINGS);
+      localStorage.removeItem(STORAGE_KEYS.SAVINGS_ACCOUNTS);
+      localStorage.removeItem(STORAGE_KEYS.SAVINGS_BALANCES);
     } catch {
       // Storage unavailable; nothing to clear.
     }
@@ -230,7 +274,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
         .from("transactions")
         .select("*, categories(name), tags(name)")
         .order("date", { ascending: false }),
-      supabase.from("monthly_savings").select("*").order("month", { ascending: true }),
+      supabase.from("savings_accounts").select("id, name, kind, position, archived").order("position"),
       supabase
         .from("user_profiles")
         .select("*")
@@ -239,8 +283,9 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
       supabase.from("goals").select("*").order("priority"),
       supabase.from("goal_contributions").select("*").order("date"),
       supabase.from("budgets").select("id, category_id, monthly_limit"),
-    ]).then(([cats, tgs, txs, svs, prof, bls, gls, gcs, bgs]) => {
-      const error = cats.error || tgs.error || txs.error || svs.error;
+      supabase.from("savings_balances").select("id, account_id, month, balance, rate").order("month"),
+    ]).then(async ([cats, tgs, txs, sva, prof, bls, gls, gcs, bgs, svb]) => {
+      const error = cats.error || tgs.error || txs.error;
       if (error) {
         console.error("Supabase load error:", error);
         setLoadError("Couldn't load your data. Check your connection and refresh.");
@@ -263,7 +308,30 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
           is_one_off: Boolean(d.is_one_off),
         }))
       );
-      setSavings(svs.data || []);
+      if (sva.error && MISSING_TABLE.includes(sva.error.code)) {
+        // Before the savings-accounts migration: show the old fixed columns as accounts.
+        setSavingsNeedsMigration(true);
+        const legacy = await supabase.from("monthly_savings").select("*").order("month");
+        const converted = fromLegacySavings(
+          (legacy.data || []).map((r: any) => ({
+            month: r.month,
+            main_checking: Number(r.main_checking || 0),
+            gx_bank: Number(r.gx_bank || 0),
+            gx_rate: Number(r.gx_rate || 0),
+            ryt_bank: Number(r.ryt_bank || 0),
+            ryt_rate: Number(r.ryt_rate || 0),
+            epf_locked: Number(r.epf_locked || 0),
+          })) as LegacyMonthlySavings[]
+        );
+        setSavingsAccounts(converted.accounts);
+        setSavingsBalances(converted.balances);
+      } else {
+        if (sva.error || svb.error) console.error("Supabase savings load error:", sva.error || svb.error);
+        setSavingsAccounts((sva.data || []).map((a: any) => ({ ...a, archived: Boolean(a.archived) })));
+        setSavingsBalances(
+          (svb.data || []).map((b: any) => ({ ...b, balance: Number(b.balance), rate: Number(b.rate) }))
+        );
+      }
       // Bills are optional: before the monthly-bills migration some columns are missing, but rows still load.
       if (bls.error) console.error("Supabase bills load error:", bls.error);
       // Goals are optional: before the goals migration the tables don't exist; everything else still loads.
@@ -333,7 +401,9 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
     if (mode !== "local" || !isLoaded) return; // guests never persist
     try {
       localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(transactions));
-      localStorage.setItem(STORAGE_KEYS.SAVINGS, JSON.stringify(savings));
+      localStorage.setItem(STORAGE_KEYS.SAVINGS_ACCOUNTS, JSON.stringify(savingsAccounts));
+      localStorage.setItem(STORAGE_KEYS.SAVINGS_BALANCES, JSON.stringify(savingsBalances));
+      localStorage.removeItem(STORAGE_KEYS.SAVINGS);
       localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(profile));
       localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(categories));
       localStorage.setItem(STORAGE_KEYS.TAGS, JSON.stringify(tags));
@@ -344,7 +414,20 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
     } catch (e) {
       console.error("Failed to save to localStorage", e);
     }
-  }, [transactions, savings, profile, categories, tags, bills, goals, goalContributions, budgets, isLoaded, mode]);
+  }, [
+    transactions,
+    savingsAccounts,
+    savingsBalances,
+    profile,
+    categories,
+    tags,
+    bills,
+    goals,
+    goalContributions,
+    budgets,
+    isLoaded,
+    mode,
+  ]);
 
   const addTransaction = async (txInput: NewTransaction) => {
     const cat = categories.find((c) => c.id === txInput.category_id);
@@ -510,46 +593,113 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
-  const updateSavings = async (updated: MonthlySavings) => {
-    setSavings((prev) => {
-      const idx = prev.findIndex((s) => s.month.startsWith(updated.month.slice(0, 7)));
-      if (idx >= 0) {
-        const next = [...prev];
-        next[idx] = updated;
-        return next;
-      }
-      return [...prev, updated];
-    });
+  // ---- Savings accounts & balances ----
+  const savingsError = (error: { code?: string }, fallback: string) =>
+    MISSING_TABLE.includes(error.code || "")
+      ? "Run scripts/migrations/2026-09-30_savings_accounts.sql in Supabase first."
+      : error.code === "23505"
+        ? "An account with that name already exists."
+        : fallback;
+  const needsSavingsMigration = () => {
+    if (!isCloud || !savingsNeedsMigration) return false;
+    showToast({ tone: "error", message: "Run scripts/migrations/2026-09-30_savings_accounts.sql in Supabase first." });
+    return true;
+  };
 
+  const saveBalances = async (
+    month: string,
+    lines: Pick<SavingsBalance, "account_id" | "balance" | "rate">[]
+  ): Promise<boolean> => {
+    if (needsSavingsMigration()) return false;
+    const monthDate = `${month.slice(0, 7)}-01`;
+    const rows = lines.map((l) => ({ ...l, month: monthDate }));
     if (isCloud) {
-      const supabase = createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { error } = await supabase.from("monthly_savings").upsert(
-        {
-          user_id: user.id,
-          month: updated.month,
-          main_checking: updated.main_checking,
-          gx_bank: updated.gx_bank,
-          gx_rate: updated.gx_rate,
-          ryt_bank: updated.ryt_bank,
-          ryt_rate: updated.ryt_rate,
-          epf_locked: updated.epf_locked,
-        },
-        { onConflict: "user_id,month" }
-      );
+      const { error } = await createClient()
+        .from("savings_balances")
+        .upsert(rows, { onConflict: "account_id,month" });
       if (error) {
         console.error("Supabase savings upsert error:", error);
         showToast({
           tone: "error",
-          message: "Couldn't save balances",
-          action: { label: "Retry", onClick: () => updateSavings(updated) },
+          message: savingsError(error, "Couldn't save balances"),
+          action: { label: "Retry", onClick: () => saveBalances(month, lines) },
         });
+        return false;
       }
     }
+    setSavingsBalances((prev) => [
+      ...prev.filter((b) => !(b.month.startsWith(month.slice(0, 7)) && rows.some((r) => r.account_id === b.account_id))),
+      ...rows.map((r) => ({ id: `bal-${r.account_id}-${month.slice(0, 7)}`, ...r })),
+    ]);
+    return true;
+  };
+
+  const addSavingsAccount = async (name: string, kind: SavingsAccount["kind"]) => {
+    if (needsSavingsMigration()) return null;
+    const trimmed = name.trim();
+    const position = savingsAccounts.reduce((max, a) => Math.max(max, a.position + 1), 0);
+    let created: SavingsAccount = { id: `acct-${Date.now()}`, name: trimmed, kind, position, archived: false };
+    if (isCloud) {
+      const { data, error } = await createClient()
+        .from("savings_accounts")
+        .insert({ name: trimmed, kind, position })
+        .select("id, name, kind, position, archived")
+        .single();
+      if (error || !data) {
+        console.error("Supabase savings account insert error:", error);
+        showToast({ tone: "error", message: savingsError(error || {}, `Couldn't add ${trimmed}.`) });
+        return null;
+      }
+      created = data as SavingsAccount;
+    } else if (savingsAccounts.some((a) => a.name.toLowerCase() === trimmed.toLowerCase())) {
+      showToast({ tone: "error", message: "An account with that name already exists." });
+      return null;
+    }
+    setSavingsAccounts((prev) => [...prev, created]);
+    return created;
+  };
+
+  const updateSavingsAccount = async (
+    id: string,
+    changes: Partial<Pick<SavingsAccount, "name" | "kind" | "archived">>
+  ) => {
+    if (needsSavingsMigration()) return false;
+    const next = changes.name !== undefined ? { ...changes, name: changes.name.trim() } : changes;
+    if (isCloud) {
+      const { error } = await createClient().from("savings_accounts").update(next).eq("id", id);
+      if (error) {
+        console.error("Supabase savings account update error:", error);
+        showToast({ tone: "error", message: savingsError(error, "Couldn't save the account.") });
+        return false;
+      }
+    } else if (
+      next.name &&
+      savingsAccounts.some((a) => a.id !== id && a.name.toLowerCase() === next.name?.toLowerCase())
+    ) {
+      showToast({ tone: "error", message: "An account with that name already exists." });
+      return false;
+    }
+    setSavingsAccounts((prev) => prev.map((a) => (a.id === id ? { ...a, ...next } : a)));
+    return true;
+  };
+
+  const deleteSavingsAccount = async (id: string) => {
+    if (needsSavingsMigration()) return false;
+    // Deleting would take its past balances (and net worth history) with it.
+    if (savingsBalances.some((b) => b.account_id === id)) {
+      showToast({ tone: "error", message: "This account has balances. Archive it instead to keep your history." });
+      return false;
+    }
+    if (isCloud) {
+      const { error } = await createClient().from("savings_accounts").delete().eq("id", id);
+      if (error) {
+        console.error("Supabase savings account delete error:", error);
+        showToast({ tone: "error", message: savingsError(error, "Couldn't delete the account.") });
+        return false;
+      }
+    }
+    setSavingsAccounts((prev) => prev.filter((a) => a.id !== id));
+    return true;
   };
 
   const updateProfile = async (next: UserSalaryProfile) => {
@@ -989,13 +1139,17 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
         categories,
         tags,
         transactions,
-        savings,
+        savingsAccounts,
+        savingsBalances,
         selectedMonth,
         setSelectedMonth,
         addTransaction,
         updateTransaction,
         deleteTransaction,
-        updateSavings,
+        saveBalances,
+        addSavingsAccount,
+        updateSavingsAccount,
+        deleteSavingsAccount,
         profile,
         updateProfile,
         emergencyMonths,

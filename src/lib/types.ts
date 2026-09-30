@@ -3,12 +3,14 @@ export interface Category {
   name: string;
   color?: string;
   icon?: string | null; // key into CATEGORY_ICON_OPTIONS; null = pick by name
+  role?: "food" | null; // marked for the Food & dining card and meal suggestions (see lib/roles.ts)
 }
 
 export interface Tag {
   id: string;
   category_id: string;
   name: string;
+  role?: "breakfast" | "lunch" | "snack" | "dinner" | "supper" | null; // meal suggested by time of day
 }
 
 export interface RecurringBill {
@@ -82,18 +84,35 @@ export interface TransactionInput {
   is_one_off?: boolean;
 }
 
-export interface MonthlySavings {
+// A savings account the person tracks (bank, e-wallet, EPF, investments, …).
+export interface SavingsAccount {
+  id: string;
+  name: string;
+  kind: "liquid" | "locked"; // locked (e.g. EPF) counts toward net worth, not the emergency fund
+  position: number; // display order
+  archived: boolean; // closed: hidden when recording new months, past months keep it
+}
+
+// One account's balance at the end of a month.
+export interface SavingsBalance {
   id?: string;
-  user_id?: string;
+  account_id: string;
+  month: string; // YYYY-MM-01
+  balance: number;
+  rate: number; // interest p.a. as a fraction (0.0355 = 3.55%); 0 = none
+}
+
+// The old fixed-column shape (monthly_savings table, before 2026-09-30_savings_accounts.sql).
+// Only read to convert older data.
+export interface LegacyMonthlySavings {
+  id?: string;
   month: string; // YYYY-MM-01
   main_checking: number;
   gx_bank: number;
-  gx_rate: number; // e.g. 0.0355
+  gx_rate: number;
   ryt_bank: number;
   ryt_rate: number;
   epf_locked: number;
-  total_liquid?: number;
-  est_interest?: number;
 }
 
 export interface UserSalaryProfile {

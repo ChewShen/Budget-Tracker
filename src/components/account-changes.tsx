@@ -1,14 +1,7 @@
 import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
-import { netWorthOf } from "@/lib/savings";
-import type { MonthlySavings } from "@/lib/types";
-
-const ACCOUNTS = [
-  { key: "main_checking", label: "Main checking" },
-  { key: "gx_bank", label: "GXBank" },
-  { key: "ryt_bank", label: "RYT / Rize" },
-  { key: "epf_locked", label: "EPF & locked" },
-] as const;
+import { netWorthOf, type Snapshot } from "@/lib/savings";
+import type { SavingsAccount } from "@/lib/types";
 
 function Change({ value }: { value: number }) {
   if (Math.abs(value) < 0.005) return <span className="text-muted-foreground">No change</span>;
@@ -24,14 +17,18 @@ function Change({ value }: { value: number }) {
 
 // Where the net worth change came from, account by account.
 export function AccountChanges({
+  accounts,
   current,
   previous,
   previousLabel,
 }: {
-  current: MonthlySavings;
-  previous: MonthlySavings;
+  accounts: SavingsAccount[]; // all of them, in display order (archived included)
+  current: Snapshot;
+  previous: Snapshot;
   previousLabel: string; // e.g. "August"
 }) {
+  // Every account in either month (one opened or closed in between shows from/to RM 0).
+  const rows = accounts.filter((a) => a.id in current.balances || a.id in previous.balances);
   const total = netWorthOf(current) - netWorthOf(previous);
 
   return (
@@ -40,12 +37,12 @@ export function AccountChanges({
       <p className="mt-0.5 text-xs text-muted-foreground">Where the change in net worth came from</p>
 
       <ul className="mt-4 divide-y divide-border/70">
-        {ACCOUNTS.map(({ key, label }) => {
-          const before = previous[key];
-          const after = current[key];
+        {rows.map(({ id, name: label }) => {
+          const before = previous.balances[id]?.balance ?? 0;
+          const after = current.balances[id]?.balance ?? 0;
           const diff = after - before;
           return (
-            <li key={key} className="flex items-center gap-3 py-2.5 text-sm">
+            <li key={id} className="flex items-center gap-3 py-2.5 text-sm">
               <span className={`flex-1 ${Math.abs(diff) < 0.005 ? "text-muted-foreground" : ""}`}>{label}</span>
               <span className="hidden text-xs text-muted-foreground tabular-nums sm:inline">
                 {formatCurrency(before)} → {formatCurrency(after)}

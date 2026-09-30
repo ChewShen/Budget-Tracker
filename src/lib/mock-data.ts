@@ -1,4 +1,5 @@
-import { Budget, Category, Goal, GoalContribution, MonthlySavings, RecurringBill, Tag, Transaction } from "./types";
+import { fromLegacySavings } from "./savings";
+import { Budget, Category, Goal, GoalContribution, LegacyMonthlySavings, RecurringBill, Tag, Transaction } from "./types";
 
 // Made-up demo data for guest mode and local-only mode (no Supabase).
 // Generated from today's date (last two full months + this month so far) with a fixed seed,
@@ -7,7 +8,7 @@ import { Budget, Category, Goal, GoalContribution, MonthlySavings, RecurringBill
 // ---- Categories & tags (generic) ----
 
 const TAXONOMY: Record<string, string[]> = {
-  Food: ["Breakfast", "Lunch", "Dinner", "Coffee", "Snack", "Groceries"],
+  Food: ["Breakfast", "Lunch", "Dinner", "Supper", "Coffee", "Snack", "Groceries"],
   Transport: ["Petrol", "Parking", "Toll", "Grab", "Season Parking"],
   Home_Bills: ["Electric", "Water", "Internet", "Phone"],
   Subscription: ["Netflix", "Spotify", "iCloud"],
@@ -21,10 +22,20 @@ const TAXONOMY: Record<string, string[]> = {
 
 export const INITIAL_CATEGORIES: Category[] = Object.keys(TAXONOMY)
   .sort()
-  .map((name, i) => ({ id: `cat-${i + 1}`, name }));
+  .map((name, i) => ({ id: `cat-${i + 1}`, name, role: name === "Food" ? ("food" as const) : null }));
+
+// Same marks as the default set for new accounts (scripts/migrations/2026-09-30_roles.sql).
+const MEAL_TAGS = ["breakfast", "lunch", "snack", "dinner", "supper"] as const;
+const mealRole = (category: string, tag: string) =>
+  category === "Food" ? MEAL_TAGS.find((m) => m === tag.toLowerCase()) ?? null : null;
 
 export const INITIAL_TAGS: Tag[] = INITIAL_CATEGORIES.flatMap((c) =>
-  TAXONOMY[c.name].map((name) => ({ id: `tag-${c.name}-${name}`.replace(/\s+/g, "-"), category_id: c.id, name }))
+  TAXONOMY[c.name].map((name) => ({
+    id: `tag-${c.name}-${name}`.replace(/\s+/g, "-"),
+    category_id: c.id,
+    name,
+    role: mealRole(c.name, name),
+  }))
 ).sort((a, b) => a.name.localeCompare(b.name));
 
 const tag = (name: string) => INITIAL_TAGS.find((t) => t.name === name) as Tag;
@@ -154,7 +165,7 @@ function buildTransactions(today: Date): Transaction[] {
 
 // ---- Savings snapshots: the two full months are recorded, this month isn't yet ----
 
-function buildSavings(today: Date): MonthlySavings[] {
+function buildSavings(today: Date): LegacyMonthlySavings[] {
   const month = (back: number) => {
     const d = new Date(today.getFullYear(), today.getMonth() - back, 1);
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-01`;
@@ -213,7 +224,10 @@ function buildGoals(today: Date): { goals: Goal[]; contributions: GoalContributi
 
 const TODAY = new Date();
 export const INITIAL_TRANSACTIONS: Transaction[] = buildTransactions(TODAY);
-export const INITIAL_SAVINGS: MonthlySavings[] = buildSavings(TODAY);
+// Built in the old fixed-column shape and converted, the same way a real account's history is.
+const DEMO_SAVINGS = fromLegacySavings(buildSavings(TODAY));
+export const INITIAL_SAVINGS_ACCOUNTS = DEMO_SAVINGS.accounts;
+export const INITIAL_SAVINGS_BALANCES = DEMO_SAVINGS.balances;
 const DEMO_GOALS = buildGoals(TODAY);
 export const INITIAL_GOALS: Goal[] = DEMO_GOALS.goals;
 export const INITIAL_GOAL_CONTRIBUTIONS: GoalContribution[] = DEMO_GOALS.contributions;

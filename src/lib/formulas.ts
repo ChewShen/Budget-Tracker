@@ -1,4 +1,4 @@
-import { Transaction, MonthlySavings, UserSalaryProfile } from "./types";
+import { Transaction, UserSalaryProfile } from "./types";
 
 /**
  * Calculates daily average spend, excluding one-off irregular spikes.
@@ -61,33 +61,21 @@ export function calculateSalaryMetrics(
 }
 
 /**
- * Calculates exact daily compounding monthly interest for digital bank savings (GXBank / Rize).
- * Matches Excel formula:
+ * Estimated interest for one month on interest-earning balances, compounded daily.
+ * Matches the Excel formula per account:
  * ROUND(Balance * ((1 + Rate/365)^DAY(EOMONTH(Month, 0)) - 1), 2)
  */
-export function calculateDigitalBankInterest(
-  gxBalance: number,
-  gxRate: number = 0.0355,
-  rytBalance: number = 0,
-  rytRate: number = 0,
+export function calculateMonthlyInterest(
+  accounts: { balance: number; rate: number }[], // rate p.a. as a fraction, e.g. 0.0355
   monthStr: string // YYYY-MM
 ): number {
   const [yearStr, mStr] = monthStr.split("-");
-  const year = parseInt(yearStr, 10);
-  const month = parseInt(mStr, 10);
-  const daysInMonth = new Date(year, month, 0).getDate();
-
-  const gxInterest =
-    gxBalance > 0
-      ? gxBalance * (Math.pow(1 + gxRate / 365, daysInMonth) - 1)
-      : 0;
-
-  const rytInterest =
-    rytBalance > 0
-      ? rytBalance * (Math.pow(1 + rytRate / 365, daysInMonth) - 1)
-      : 0;
-
-  return Math.round((gxInterest + rytInterest) * 100) / 100;
+  const daysInMonth = new Date(parseInt(yearStr, 10), parseInt(mStr, 10), 0).getDate();
+  const total = accounts.reduce(
+    (sum, a) => sum + (a.balance > 0 && a.rate > 0 ? a.balance * (Math.pow(1 + a.rate / 365, daysInMonth) - 1) : 0),
+    0
+  );
+  return Math.round(total * 100) / 100;
 }
 
 /**

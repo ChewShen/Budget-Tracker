@@ -33,7 +33,7 @@ Guest mode never touches the database and stores nothing in your browser, so **n
 ## 📱 Highlights & Features
 
 ### ⚡ Fast entry
-- **Add an expense in a few taps**: numpad sheet, **Recent** shortcuts (tag + last amount), and a tag picked for the time of day (breakfast, lunch, dinner…).
+- **Add an expense in a few taps**: numpad sheet, **Recent** shortcuts (tag + last amount), and a tag picked for the time of day (breakfast, lunch, dinner…), which keeps working if you rename it.
 - **Edit or delete** any entry, with a 5-second **Undo**; failed saves roll back with **Retry**.
 - **Your own categories and tags** (with icons), created in Settings or on the spot while adding.
 - Installable **PWA** for iOS/Android home screens; keyboard entry on desktop.
@@ -55,7 +55,7 @@ Guest mode never touches the database and stores nothing in your browser, so **n
 
 ### 🏦 Savings & salary
 - **Malaysian salary engine**: EPF, SOCSO and EIS deductions, take-home pay and savings rate (editable).
-- **Month-end balances** per account with daily-compounded interest estimates (GXBank, RYT).
+- **Your own savings accounts** (banks, e-wallets, EPF, investments): add, rename or archive them, mark each as liquid or locked, and record month-end balances with daily-compounded interest estimates.
 - **Emergency fund**: months of spending covered, a goal, and when you'll reach it at your pace.
 - **Where it changed**: balance changes by account, the **untracked cash** check (growth vs. what the budget says you saved) and **savings rate by month**.
 
@@ -79,11 +79,11 @@ Guest mode never touches the database and stores nothing in your browser, so **n
 - **Styling & UI**: [Tailwind CSS](https://tailwindcss.com/) + [Lucide Icons](https://lucide.dev/) + Inter font
 - **Charts & Visualizations**: [Recharts](https://recharts.org/) plus custom accessible bar lists and a calendar heatmap
 - **Database & Authentication**: [Supabase (PostgreSQL)](https://supabase.com/) with Row-Level Security (RLS) and `pg_cron`
-- **PWA Integration**: Web App Manifest and home-screen icons
+- **PWA & notifications**: Web App Manifest, home-screen icons, a push-only service worker and Web Push (VAPID, [`web-push`](https://github.com/web-push-libs/web-push))
+- **Hosting & jobs**: [Vercel](https://vercel.com/) (free Hobby tier) with Vercel Cron for daily reminders
 - **Quality**: TypeScript, ESLint, formula parity tests, GitHub Actions CI
 
 Why these tools and the main design choices: [`docs/decisions.md`](docs/decisions.md).
-- **Hosting**: [Vercel](https://vercel.com/) (free Hobby tier)
 
 ---
 
@@ -106,7 +106,8 @@ Why these tools and the main design choices: [`docs/decisions.md`](docs/decision
 ┌──────────────────────────────▼──────────────────────────────┐
 │                  DATABASE TIER (SUPABASE)                   │
 │  • PostgreSQL 16 Relational Engine                          │
-│  • Row-Level Security (RLS) Policies                        │
+│  • Row-Level Security (RLS): each account sees only its own │
+│  • Trigger: new accounts get default categories and tags    │
 │  • pg_cron: daily auto-add of due monthly bills             │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -205,7 +206,7 @@ To bring in history from an Excel budget sheet (same layout as `Monthly Budget.x
    ```bash
    python3 scripts/migrate_excel.py "path/to/Monthly Budget.xlsm"
    ```
-   This writes `scripts/seed_data.sql` (categories, tags, transactions and savings snapshots).
+   This writes `scripts/seed_data.sql` (categories, tags, transactions and savings snapshots). The savings go into the old `monthly_savings` table; `2026-09-30_savings_accounts.sql` (below) turns them into accounts.
 2. Paste it into the Supabase SQL Editor and click **Run**.
 
 Your spreadsheet and the generated `seed_data.sql` contain real financial data, so both are **gitignored**; keep them out of the repository.
@@ -230,6 +231,8 @@ One-off SQL changes for existing databases live in [`scripts/migrations/`](scrip
 - `2026-09-29_budgets.sql`: `budgets` table (monthly limit per category), owner-only RLS.
 - `2026-09-29_reminders.sql`: `push_subscriptions` (devices), `reminder_settings` (which reminders) and `reminder_log` (what was already sent) for phone notifications. See [Reminders](#5-reminders-optional).
 - `2026-09-30_multi_user.sql`: each account gets its own categories and tags (existing ones stay yours), category names are unique per account, expenses/bills/budgets can only use your own categories and tags, and new accounts start with a profile and a default set of categories and tags. See [Adding a friend](#adding-a-friend). After this, `secure_rls.sql` refuses to run (it would re-open categories and tags).
+- `2026-09-30_roles.sql`: marks each account's food category and meal tags (breakfast, lunch, tea time, dinner, late night) so the Food & dining card and the time-of-day tag in Add expense keep working after renames; new accounts also get a Supper tag. Starred in Settings → Categories & tags.
+- `2026-09-30_savings_accounts.sql`: savings become per-person accounts (`savings_accounts`) with a month-end balance each (`savings_balances`) instead of the fixed Main checking / GXBank / RYT / EPF columns. Your history is copied over (same account names, net worth per month unchanged; the last query shows before/after); `monthly_savings` is kept as a backup.
 
 ### Adding a friend
 Sign-up stays off, so strangers can't create accounts. To give someone their own account:
@@ -309,8 +312,10 @@ To run the job by hand: `curl -H "Authorization: Bearer $CRON_SECRET" https://<y
 | **Net Cash Saved** | $\text{Net Salary} - \text{Total Spend}$ |
 | **Savings Rate** | $\frac{\text{Net Cash Saved}}{\text{Net Salary}} \times 100\%$ |
 | **Daily Average** | $\frac{\sum \text{Spend (where is\_one\_off = false)}}{\min(\text{DaysInMonth}, \text{CurrentDay})}$ |
-| **GXBank Monthly Interest** | $\text{Balance} \times \left( \left(1 + \frac{0.0355}{365}\right)^{\text{DaysInMonth}} - 1 \right)$ |
+| **Monthly Interest** (per liquid account) | $\text{Balance} \times \left( \left(1 + \frac{\text{Rate}}{365}\right)^{\text{DaysInMonth}} - 1 \right)$ |
 | **Untracked Cash** | $(\text{Total Liquid}_{\text{curr}} - \text{Total Liquid}_{\text{prev}}) - \text{Net Cash Saved}$ |
+
+Liquid = every savings account not marked as locked (EPF and similar count toward net worth only).
 
 ---
 

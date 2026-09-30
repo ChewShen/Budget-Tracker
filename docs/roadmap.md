@@ -10,7 +10,7 @@ When one is picked up, move it to `docs/changelog.md` under the version that shi
 - **12-month projection**: "At your average saving of RM X/month plus interest, you'd have about RM Y by <month next year>". State the assumptions; only show with at least 2 recorded months.
 - **Interest summary**: Estimated interest earned so far this year, and a nudge when money is sitting at 0% (e.g. "RM 500 in checking would earn about RM 17.75/year in GXBank at 3.55%").
 - **Untracked cash history**: The monthly "untracked" amount over time, to see whether unlogged spending is a pattern or a one-off.
-- **Flexible savings accounts**: Add, rename or remove accounts (ASB, TnG GO+, Versa, stocks, …), each with its own rate and a liquid/locked type. Needs a schema change (accounts table + per-month balances) and migrating the four fixed columns.
+- **Reorder savings accounts**: Accounts are listed in the order they were added; let them be moved up and down in Settings → Savings accounts.
 
 ## Budgeting
 
@@ -27,8 +27,8 @@ When one is picked up, move it to `docs/changelog.md` under the version that shi
 
 ## Robustness
 
-- **Match by id instead of name**: The "Food & dining" card and the time-of-day meal default look for a category literally named "Food" and tags named "Breakfast", "Lunch", …; make these configurable in Settings.
-- **Automated tests**: Turn the ad-hoc browser checks into Playwright tests in CI, and add unit tests for `src/lib/analytics.ts`, `savings.ts` and `bills.ts`.
+- **Load expenses in pages**: Supabase returns at most 1,000 rows per request; past about 1,000 expenses the oldest would silently stop loading. Page the load (or raise the limit) before that.
+- **Automated tests**: Turn the ad-hoc browser checks into Playwright tests in CI, add unit tests for `src/lib/analytics.ts`, `savings.ts`, `bills.ts` and `reminders.ts`, and commit the PGlite database tests (RLS per user, migrations replayed in order).
 - **Recharts v3**: v2 is deprecated.
 
 ## Data housekeeping
@@ -36,4 +36,4 @@ When one is picked up, move it to `docs/changelog.md` under the version that shi
 - **Keep real data out of git**: `*.xlsm`, `*.xlsx`, `scripts/seed_data.sql` and `private/` are gitignored, and local git hooks (pre-commit, commit-msg, pre-push, using a gitignored list in `private/guard/`) block commits and pushes containing real personal data. Hooks live only in `.git/hooks`: when cloning elsewhere, copy `private/` and reinstall them. The earlier private repository (with the original, unscrubbed history) is archived and no longer used.
 
 - Check August 2026 balances from the Excel import (Main checking RM 0, EPF RM 10 look wrong).
-- Optionally delete the all-zero savings rows the import created for Sep–Dec 2026 (the app already treats them as "not recorded").
+- Once the new savings accounts look right, `monthly_savings` (kept as a backup by `2026-09-30_savings_accounts.sql`) can be dropped.

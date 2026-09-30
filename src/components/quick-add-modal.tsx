@@ -7,16 +7,9 @@ import { format, subDays } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
 import { Category, Transaction } from "@/lib/types";
 import { useBudget, type NewTransaction } from "@/lib/budget-context";
+import { foodCategory, mealForHour, mealTag } from "@/lib/roles";
 import { getDefaultDateMode, getLastEntryDate, setLastEntryDate } from "@/lib/preferences";
 
-// Food tag most likely for the current time of day (used as the default when the sheet opens).
-function mealForHour(hour: number): string {
-  if (hour >= 5 && hour < 11) return "Breakfast";
-  if (hour >= 11 && hour < 15) return "Lunch";
-  if (hour >= 15 && hour < 17) return "Snack";
-  if (hour >= 17 && hour < 22) return "Dinner";
-  return "Supper";
-}
 
 const RECENT_DAYS = 90;
 const RECENT_LIMIT = 6;
@@ -103,8 +96,9 @@ export function QuickAddModal({
     const today = format(new Date(), "yyyy-MM-dd");
     setSelectedDate(getDefaultDateMode() === "last" ? getLastEntryDate() || today : today);
 
-    const food = categories.find((c) => c.name.toLowerCase() === "food");
-    const meal = food && tags.find((t) => t.category_id === food.id && t.name === mealForHour(new Date().getHours()));
+    // The meal tag for the time of day (e.g. lunch at 1pm), found by its mark so renaming is fine.
+    const food = foodCategory(categories);
+    const meal = mealTag(categories, tags, mealForHour(new Date().getHours()));
     const lastUsed = [...transactions].sort((a, b) => b.date.localeCompare(a.date))[0];
 
     if (meal) {
