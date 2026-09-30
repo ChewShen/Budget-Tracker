@@ -12,6 +12,7 @@ import { SalaryEngine } from "@/components/salary-engine";
 import { RecurringSentinel, type BillStatus } from "@/components/recurring-sentinel";
 import { canAutoLog } from "@/lib/bills";
 import { categoryLabel } from "@/lib/categories";
+import { foodCategory } from "@/lib/roles";
 import { formatCurrency } from "@/lib/utils";
 import {
   baseline,
@@ -63,8 +64,9 @@ export default function DashboardPage() {
 
   // 1. Calculate Total Spend & Food Spend
   const totalSpend = monthTransactions.reduce((sum, t) => sum + t.amount, 0);
+  const foodId = foodCategory(categories)?.id;
   const foodSpend = monthTransactions
-    .filter((t) => (t.category_name || "").toLowerCase() === "food")
+    .filter((t) => t.category_id === foodId)
     .reduce((sum, t) => sum + t.amount, 0);
 
   // 1b. Previous month total & daily series for the hero chart

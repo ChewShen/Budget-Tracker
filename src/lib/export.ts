@@ -1,12 +1,13 @@
 import { format, parseISO } from "date-fns";
 import { categoryLabel } from "./categories";
-import { liquidOf, netWorthOf, recordedHistory } from "./savings";
+import { accountsFor, buildSnapshots, liquidOf, netWorthOf } from "./savings";
 import type {
   Category,
   Goal,
   GoalContribution,
-  MonthlySavings,
   RecurringBill,
+  SavingsAccount,
+  SavingsBalance,
   Tag,
   Transaction,
   UserSalaryProfile,
@@ -46,32 +47,35 @@ export function transactionsCsv(txs: Transaction[]): string {
   return toCsv(["Date", "Day", "Category", "Tag", "Note", "Amount (RM)", "One-off"], rows);
 }
 
-export function savingsCsv(savings: MonthlySavings[]): string {
-  const rows = recordedHistory(savings).map((s) => [
+// One row per recorded month, one column per account (plus its rate when it ever had one).
+export function savingsCsv(accounts: SavingsAccount[], balances: SavingsBalance[]): string {
+  const snapshots = buildSnapshots(balances);
+  const columns = accountsFor(accounts).concat(accounts.filter((a) => a.archived));
+  const shown = columns.filter((a) => snapshots.some((s) => a.id in s.balances));
+  const withRate = new Set(balances.filter((b) => b.rate > 0).map((b) => b.account_id));
+
+  const header = [
+    "Month",
+    ...shown.flatMap((a) => [
+      `${a.name} (RM)`,
+      ...(withRate.has(a.id) ? [`${a.name} rate (% p.a.)`] : []),
+    ]),
+    "Liquid (RM)",
+    "Net worth (RM)",
+  ];
+  const rows = snapshots.map((s) => [
     cell(s.month.slice(0, 7), false),
-    money(s.main_checking),
-    money(s.gx_bank),
-    cell((s.gx_rate * 100).toFixed(2), false),
-    money(s.ryt_bank),
-    cell((s.ryt_rate * 100).toFixed(2), false),
-    money(s.epf_locked),
-    money(liquidOf(s)),
+    ...shown.flatMap((a) => {
+      const b = s.balances[a.id];
+      return [
+        b ? money(b.balance) : "",
+        ...(withRate.has(a.id) ? [b ? cell((b.rate * 100).toFixed(2), false) : ""] : []),
+      ];
+    }),
+    money(liquidOf(s, accounts)),
     money(netWorthOf(s)),
   ]);
-  return toCsv(
-    [
-      "Month",
-      "Main checking (RM)",
-      "GXBank (RM)",
-      "GXBank rate (% p.a.)",
-      "RYT / Rize (RM)",
-      "RYT rate (% p.a.)",
-      "EPF & locked (RM)",
-      "Liquid (RM)",
-      "Net worth (RM)",
-    ],
-    rows
-  );
+  return toCsv(header, rows);
 }
 
 // ---- JSON backup ----
@@ -84,9 +88,11 @@ export function backupJson(data: {
   goals: Goal[];
   goalContributions: GoalContribution[];
   transactions: Transaction[];
-  savings: MonthlySavings[];
+  savingsAccounts: SavingsAccount[];
+  savingsBalances: SavingsBalance[];
 }): string {
-  return JSON.stringify({ app: "budget-tracker", schema: 1, exportedAt: new Date().toISOString(), ...data }, null, 2);
+  // schema 2: savings as accounts + balances (schema 1 had fixed monthly_savings columns).
+  return JSON.stringify({ app: "budget-tracker", schema: 2, exportedAt: new Date().toISOString(), ...data }, null, 2);
 }
 
 // ---- Download ----

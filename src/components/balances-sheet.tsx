@@ -1,28 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X } from "lucide-react";
-import { MonthlySavings } from "@/lib/types";
+import Link from "next/link";
+import { Lock, Settings2, X } from "lucide-react";
+import type { DraftLine } from "@/lib/savings";
+import type { SavingsBalance } from "@/lib/types";
 import { formatCurrency } from "@/lib/utils";
 
 interface BalancesSheetProps {
   isOpen: boolean;
   monthLabel: string; // e.g. "30 Sep 2026"
-  draft: MonthlySavings;
-  previous?: MonthlySavings;
+  lines: DraftLine[]; // one per account, pre-filled (carried forward from the last record)
   previousLabel?: string; // e.g. "Aug", shown next to the earlier balance
   onClose: () => void;
-  onSave: (snapshot: MonthlySavings) => void;
+  onSave: (lines: Pick<SavingsBalance, "account_id" | "balance" | "rate">[]) => void;
 }
-
-type Field = "main_checking" | "gx_bank" | "ryt_bank" | "epf_locked" | "gx_rate" | "ryt_rate";
-
-const ACCOUNTS: { key: Field; label: string; rateKey?: Field }[] = [
-  { key: "main_checking", label: "Main checking" },
-  { key: "gx_bank", label: "GXBank", rateKey: "gx_rate" },
-  { key: "ryt_bank", label: "RYT / Rize", rateKey: "ryt_rate" },
-  { key: "epf_locked", label: "EPF & locked" },
-];
 
 // Money fields are edited as strings so they can be cleared and typed freely ("", "12.", "0.05").
 const toText = (n: number) => (n ? String(Math.round(n * 100) / 100) : "");
@@ -32,39 +24,28 @@ const toNumber = (text: string) => {
 };
 const isDecimalInput = (text: string) => /^\d*\.?\d{0,4}$/.test(text.replace(/,/g, ""));
 
-function textsFrom(s: MonthlySavings): Record<Field, string> {
-  return {
-    main_checking: toText(s.main_checking),
-    gx_bank: toText(s.gx_bank),
-    ryt_bank: toText(s.ryt_bank),
-    epf_locked: toText(s.epf_locked),
-    gx_rate: toText(s.gx_rate * 100),
-    ryt_rate: toText(s.ryt_rate * 100),
-  };
-}
+type Texts = Record<string, { balance: string; rate: string }>; // by account id
 
-export function BalancesSheet({
-  isOpen,
-  monthLabel,
-  draft,
-  previous,
-  previousLabel,
-  onClose,
-  onSave,
-}: BalancesSheetProps) {
-  const [values, setValues] = useState<Record<Field, string>>(() => textsFrom(draft));
-  const [initial, setInitial] = useState<Record<Field, string>>(() => textsFrom(draft));
+const textsFrom = (lines: DraftLine[]): Texts =>
+  Object.fromEntries(lines.map((l) => [l.account.id, { balance: toText(l.balance), rate: toText(l.rate * 100) }]));
+
+export function BalancesSheet({ isOpen, monthLabel, lines, previousLabel, onClose, onSave }: BalancesSheetProps) {
+  const [values, setValues] = useState<Texts>(() => textsFrom(lines));
+  const [initial, setInitial] = useState<Texts>(() => textsFrom(lines));
 
   useEffect(() => {
     if (!isOpen) return;
-    const texts = textsFrom(draft);
+    const texts = textsFrom(lines);
     setValues(texts);
     setInitial(texts);
     // Reset only when the sheet opens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
-  const isDirty = (Object.keys(values) as Field[]).some((k) => values[k] !== initial[k]);
+  const isDirty = lines.some(
+    ({ account: { id } }) =>
+      values[id]?.balance !== initial[id]?.balance || values[id]?.rate !== initial[id]?.rate
+  );
 
   const requestClose = () => {
     if (isDirty && !window.confirm("Discard your changes?")) return;
@@ -80,24 +61,22 @@ export function BalancesSheet({
 
   if (!isOpen) return null;
 
-  const set = (key: Field, text: string) => {
-    if (isDecimalInput(text)) setValues((v) => ({ ...v, [key]: text }));
+  const set = (id: string, field: "balance" | "rate", text: string) => {
+    if (isDecimalInput(text)) setValues((v) => ({ ...v, [id]: { ...v[id], [field]: text } }));
   };
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSave({
-      month: draft.month,
-      main_checking: toNumber(values.main_checking),
-      gx_bank: toNumber(values.gx_bank),
-      gx_rate: toNumber(values.gx_rate) / 100,
-      ryt_bank: toNumber(values.ryt_bank),
-      ryt_rate: toNumber(values.ryt_rate) / 100,
-      epf_locked: toNumber(values.epf_locked),
-    });
+    onSave(
+      lines.map(({ account }) => ({
+        account_id: account.id,
+        balance: toNumber(values[account.id]?.balance ?? ""),
+        rate: account.kind === "liquid" ? toNumber(values[account.id]?.rate ?? "") / 100 : 0,
+      }))
+    );
   };
 
-  const total = ACCOUNTS.reduce((sum, a) => sum + toNumber(values[a.key]), 0);
+  const total = lines.reduce((sum, l) => sum + toNumber(values[l.account.id]?.balance ?? ""), 0);
 
   return (
     <div
@@ -128,39 +107,44 @@ export function BalancesSheet({
         </div>
 
         <form onSubmit={submit} className="mt-4 space-y-3 pb-5">
-          {ACCOUNTS.map((a) => {
-            const prev = previous?.[a.key as keyof MonthlySavings] as number | undefined;
+          {lines.map(({ account, previous }) => {
+            const id = `balance-${account.id}`;
             return (
-              <div key={a.key} className="rounded-xl bg-secondary/50 p-4">
-                <label htmlFor={a.key} className="text-xs font-medium text-muted-foreground">
-                  {a.label}
+              <div key={account.id} className="rounded-xl bg-secondary/50 p-4">
+                <label htmlFor={id} className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                  {account.name}
+                  {account.kind === "locked" && <Lock className="h-3 w-3" aria-label="Locked" />}
                 </label>
                 <div className="mt-1.5 flex items-baseline gap-1.5">
                   <span className="text-sm text-muted-foreground">RM</span>
                   <input
-                    id={a.key}
+                    id={id}
                     type="text"
                     inputMode="decimal"
                     autoComplete="off"
                     placeholder="0"
-                    value={values[a.key]}
-                    onChange={(e) => set(a.key, e.target.value)}
+                    value={values[account.id]?.balance ?? ""}
+                    onChange={(e) => set(account.id, "balance", e.target.value)}
                     className="w-full bg-transparent text-xl font-semibold tabular-nums tracking-tight outline-none placeholder:text-muted-foreground/40"
                   />
                 </div>
                 <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-                  <span>{prev !== undefined ? `${previousLabel}: ${formatCurrency(prev)}` : "No earlier record"}</span>
-                  {a.rateKey && (
+                  <span>
+                    {previous !== undefined && previousLabel
+                      ? `${previousLabel}: ${formatCurrency(previous)}`
+                      : "No earlier record"}
+                  </span>
+                  {account.kind === "liquid" && (
                     <label className="flex items-center gap-1.5">
                       Interest
                       <input
                         type="text"
                         inputMode="decimal"
-                        value={values[a.rateKey]}
-                        onChange={(e) => set(a.rateKey as Field, e.target.value)}
+                        value={values[account.id]?.rate ?? ""}
+                        onChange={(e) => set(account.id, "rate", e.target.value)}
                         placeholder="0"
                         className="w-16 rounded-lg border border-input bg-background px-2 py-1 text-right font-medium tabular-nums text-foreground outline-none focus:ring-2 focus:ring-ring/30"
-                        aria-label={`${a.label} interest rate`}
+                        aria-label={`${account.name} interest rate`}
                       />
                       % p.a.
                     </label>
@@ -169,6 +153,16 @@ export function BalancesSheet({
               </div>
             );
           })}
+
+          <Link
+            href="/settings/savings"
+            onClick={(e) => {
+              if (isDirty && !window.confirm("Discard your changes?")) e.preventDefault();
+            }}
+            className="flex items-center justify-center gap-1.5 rounded-xl border border-dashed py-2.5 text-xs text-muted-foreground transition hover:border-foreground/40 hover:text-foreground"
+          >
+            <Settings2 className="h-3.5 w-3.5" /> Add, rename or archive accounts
+          </Link>
 
           <div className="flex items-center justify-between px-1 pt-1 text-sm">
             <span className="text-muted-foreground">Net worth</span>
