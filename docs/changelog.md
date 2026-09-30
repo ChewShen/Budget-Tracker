@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Planned
+- See [`docs/roadmap.md`](roadmap.md) for the idea backlog.
+- [ ] Configure custom domain (optional).
+
+---
+
+## [0.15.0] - 2026-09-30
+
 ### Added
 - **Multiple accounts**: friends can have their own account with completely separate data. New accounts start with a default set of categories and tags. Accounts are added in the Supabase dashboard (see README → Adding a friend).
 - **Change password** in Settings → Account.
@@ -25,10 +33,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `scripts/migrations/2026-09-30_roles.sql`: food category and meal tag marks.
 - `scripts/migrations/2026-09-30_savings_accounts.sql`: `savings_accounts` and `savings_balances`, with existing balances copied over (`monthly_savings` kept as a backup).
 - `secure_rls.sql` refuses to run after the multi-user migration, and older migrations no longer undo it when re-run.
-
-### Planned
-- See [`docs/roadmap.md`](roadmap.md) for the idea backlog.
-- [ ] Configure custom domain (optional).
 
 ---
 
