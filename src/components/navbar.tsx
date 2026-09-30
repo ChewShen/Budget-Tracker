@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { Plus, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -19,6 +20,13 @@ const LINKS = [
 
 export function Navbar({ onOpenQuickAdd }: NavbarProps) {
   const pathname = usePathname();
+  const inSettings = pathname.startsWith("/settings");
+
+  // The page Settings was opened from, so the settings button can take you back to it.
+  const returnTo = useRef("/");
+  useEffect(() => {
+    if (!inSettings) returnTo.current = pathname;
+  }, [pathname, inSettings]);
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-border/60 bg-background/80 pt-safe backdrop-blur-xl">
@@ -50,13 +58,14 @@ export function Navbar({ onOpenQuickAdd }: NavbarProps) {
         <div className="flex items-center gap-1.5">
           <ThemeToggle />
           <Link
-            href="/settings"
+            href={inSettings ? returnTo.current : "/settings"}
             className={cn(
               "flex h-9 w-9 items-center justify-center rounded-full transition hover:bg-secondary hover:text-foreground",
-              pathname.startsWith("/settings") ? "bg-secondary text-foreground" : "text-muted-foreground"
+              inSettings ? "bg-secondary text-foreground" : "text-muted-foreground"
             )}
-            aria-label="Settings"
-            title="Settings"
+            aria-label={inSettings ? "Close settings" : "Settings"}
+            aria-pressed={inSettings}
+            title={inSettings ? "Close settings" : "Settings"}
           >
             <Settings className="h-[18px] w-[18px]" />
           </Link>
