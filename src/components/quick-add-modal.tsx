@@ -9,6 +9,7 @@ import { Category, Transaction } from "@/lib/types";
 import { useBudget, type NewTransaction } from "@/lib/budget-context";
 import { foodCategory, mealForHour, mealTag } from "@/lib/roles";
 import { defaultEntryDate, getDefaultDateMode, getLastEntryDate, setLastEntryDate } from "@/lib/preferences";
+import { useScrollLock } from "@/lib/use-scroll-lock";
 
 
 const RECENT_DAYS = 90;
@@ -157,6 +158,8 @@ export function QuickAddModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [isOpen, onClose]);
 
+  useScrollLock(isOpen);
+
   if (!isOpen) return null;
 
   const handleNumpad = (digit: string) => {
@@ -225,7 +228,7 @@ export function QuickAddModal({
         aria-modal="true"
         aria-label={title}
         onClick={(e) => e.stopPropagation()}
-        className="max-h-sheet w-full max-w-md animate-sheet-up sm:max-w-lg overflow-y-auto rounded-t-3xl border bg-card px-5 pb-safe pt-3 shadow-2xl sm:rounded-3xl sm:pb-5"
+        className="max-h-sheet w-full overscroll-contain max-w-md animate-sheet-up sm:max-w-lg overflow-y-auto rounded-t-3xl border bg-card px-5 pb-safe pt-3 shadow-2xl sm:rounded-3xl sm:pb-5"
       >
         {/* Grabber (mobile) */}
         <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-border sm:hidden" />
