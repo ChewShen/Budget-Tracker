@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { SUPABASE_URL } from "./supabase/config";
 
 // Server-only helpers for /api/reminders. Nothing here may be imported by client code:
-// it reads the VAPID private key and the Supabase service role key.
+// it reads the VAPID private key and the Supabase secret (service role) key.
 
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "";
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || "";
@@ -11,6 +11,19 @@ const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || "";
 const VAPID_SUBJECT = process.env.VAPID_SUBJECT || "https://github.com/ChewShen/budget-tracker";
 
 export const isPushConfigured = Boolean(VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY);
+
+// Names of the variables the nightly job needs but this deployment doesn't have, so a failed
+// run says exactly what to add (in Vercel → Settings → Environment Variables, then redeploy).
+export function missingServerEnv(): string[] {
+  return [
+    ["NEXT_PUBLIC_SUPABASE_URL", SUPABASE_URL],
+    ["SUPABASE_SERVICE_ROLE_KEY", process.env.SUPABASE_SERVICE_ROLE_KEY],
+    ["NEXT_PUBLIC_VAPID_PUBLIC_KEY", VAPID_PUBLIC_KEY],
+    ["VAPID_PRIVATE_KEY", VAPID_PRIVATE_KEY],
+  ]
+    .filter(([, value]) => !value)
+    .map(([name]) => name as string);
+}
 
 export interface StoredSubscription {
   user_id: string;
@@ -46,7 +59,8 @@ export async function sendPush(sub: StoredSubscription, payload: PushPayload): P
   }
 }
 
-// Service role client: bypasses RLS, so every query must filter by user_id itself.
+// Admin client from SUPABASE_SERVICE_ROLE_KEY: the project's secret key (sb_secret_…) or the
+// legacy service_role key. It bypasses RLS, so every query for a person's data filters by user_id.
 export function createAdminClient() {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!SUPABASE_URL || !key) return null;
