@@ -43,7 +43,7 @@ export function SpendingTrend({ data, average, selectedMonth, onSelectMonth }: S
         <div>
           <h3 className="text-[15px] font-semibold">Monthly spending</h3>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            {data.length < 2 ? "Builds up as you log more months" : `Last ${data.length} months · tap a bar to open it`}
+            {data.length < 2 ? "Builds up as you log more months" : `${data.length} months · tap a bar to open it`}
           </p>
         </div>
         {average !== null && (

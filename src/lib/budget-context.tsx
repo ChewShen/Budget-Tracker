@@ -28,6 +28,7 @@ import {
 } from "./mock-data";
 import { disablePush } from "./push";
 import { createClient } from "./supabase/client";
+import { fetchAllTransactions } from "./supabase/fetch-all";
 import { isSupabaseConfigured } from "./supabase/config";
 import { exitGuest, isGuestSession } from "./guest";
 import { dueAutoBills } from "./bills";
@@ -270,10 +271,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
     Promise.all([
       supabase.from("categories").select("*").order("name"),
       supabase.from("tags").select("*").order("name"),
-      supabase
-        .from("transactions")
-        .select("*, categories(name), tags(name)")
-        .order("date", { ascending: false }),
+      fetchAllTransactions(supabase),
       supabase.from("savings_accounts").select("id, name, kind, position, archived").order("position"),
       supabase
         .from("user_profiles")

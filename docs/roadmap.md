@@ -27,7 +27,6 @@ When one is picked up, move it to `docs/changelog.md` under the version that shi
 
 ## Robustness
 
-- **Load expenses in pages**: Supabase returns at most 1,000 rows per request; past about 1,000 expenses the oldest would silently stop loading. Page the load (or raise the limit) before that.
 - **Automated tests**: Turn the ad-hoc browser checks into Playwright tests in CI, add unit tests for `src/lib/analytics.ts`, `savings.ts`, `bills.ts` and `reminders.ts`, and commit the PGlite database tests (RLS per user, migrations replayed in order).
 - **Recharts v3**: v2 is deprecated.
 

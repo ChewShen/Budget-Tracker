@@ -38,9 +38,18 @@ Each entry covers what was chosen, why, and what it costs. For what changed and 
 ## 2. Data
 
 ### One client-side store with optimistic updates (`src/lib/budget-context.tsx`)
-- **Why:** One person's data is small (thousands of rows), so the app loads it all once and every page computes from memory. Adding, editing and deleting update the screen immediately, then save in the background. If a save fails, the change rolls back and the toast offers **Retry**. Deletes have a 5-second **Undo**.
+- **Why:** One person's data is small (thousands of rows), so the app loads it all when it opens (in batches, see below) and every page computes from memory. Adding, editing and deleting update the screen immediately, then save in the background. If a save fails, the change rolls back and the toast offers **Retry**. Deletes have a 5-second **Undo**.
 - **Trade-off:** The context file is large, and it would need paging or server-side queries if the data grew a lot.
-- **Known limit:** Supabase returns at most 1,000 rows per request by default, and expenses are loaded in one request. Past about 1,000 expenses the oldest would silently stop loading; paging the load is on the roadmap.
+
+### Expenses are fetched in batches, not in one full request
+- **What:** `src/lib/supabase/fetch-all.ts` requests expenses 1,000 at a time (`.range(from, to)`, ordered by date then id) and keeps going until a batch comes back empty.
+- **Why not one request:** Supabase (PostgREST) caps every response at the project's "max rows", 1,000 by default. A single "select everything" silently returned only the newest 1,000, so past that point older expenses would have quietly disappeared from totals, trends and year to date, with no error.
+- **Why stop on an empty batch, not a short one:** If a project's limit were set lower (say 500), a "stop when a batch has fewer than 1,000 rows" loop would end after the first batch. Reading until an empty batch works with any limit, for one tiny extra request.
+- **Why date then id:** A stable order means no expense is skipped or repeated between batches, even when many share a date.
+- **All or nothing:** If any batch fails, the load fails with an error instead of showing partial data that looks complete.
+- **Why not load only 50 (or one month):** The forecast, 3-month averages, 12-month trends, year to date, budgets and reminders all need the history, so loading less would make those numbers silently wrong. The cost of loading everything is small: about 150 bytes per expense, so 5,000 expenses is about 750 KB in 5 batches (plus the final empty one).
+- **Drawing is what's paged:** Rendering thousands of rows is what actually slows a phone down, so the Transactions list draws 50 at a time with **Show 50 more**. Search, filters and day totals still use every expense.
+- **When to change:** Around 10,000+ expenses, move the totals into SQL (views or RPC functions) and load only recent months up front, fetching older ones when opened.
 
 ### Three data modes: cloud, local, guest
 - **Cloud:** Supabase configured and signed in. The real app.
