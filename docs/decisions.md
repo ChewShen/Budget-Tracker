@@ -40,7 +40,7 @@ Each entry covers what was chosen, why, and what it costs. For what changed and 
 ### One client-side store with optimistic updates (`src/lib/budget-context.tsx`)
 - **Why:** One person's data is small (thousands of rows), so the app loads it all once and every page computes from memory. Adding, editing and deleting update the screen immediately, then save in the background. If a save fails, the change rolls back and the toast offers **Retry**. Deletes have a 5-second **Undo**.
 - **Trade-off:** The context file is large, and it would need paging or server-side queries if the data grew a lot.
-- **Known limit:** Supabase returns at most 1,000 rows per request by default, and expenses are loaded in one request. Past about 1,000 expenses the oldest would silently stop loading; paging the load is on the roadmap.
+- **Loaded in pages, drawn in pages:** Supabase returns at most 1,000 rows per request, so expenses are fetched in pages until one comes back empty (`src/lib/supabase/fetch-all.ts`). All of them are kept in memory, because the forecast, averages, trends and year to date need the history. What's limited is *drawing*: the Transactions list shows 50 rows and a "Show more" button, since rendering thousands of rows is what slows a phone down. At around 10,000+ expenses, totals should move into SQL views instead.
 
 ### Three data modes: cloud, local, guest
 - **Cloud:** Supabase configured and signed in. The real app.
