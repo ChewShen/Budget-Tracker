@@ -28,20 +28,22 @@ export function BottomNav({ onOpenQuickAdd }: BottomNavProps) {
             <Link
               key={href}
               href={href}
+              aria-current={isActive ? "page" : undefined}
               className={cn(
-                "flex h-11 flex-1 items-center justify-center gap-1.5 rounded-full text-xs font-medium transition-colors",
+                // Icon over a small label on every tab: same width and alignment whichever is active.
+                "flex h-12 min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-full text-[10px] font-medium transition-colors",
                 isActive ? "bg-secondary text-foreground" : "text-muted-foreground"
               )}
             >
               <Icon className="h-[18px] w-[18px]" strokeWidth={isActive ? 2.25 : 2} />
-              {isActive && <span>{label}</span>}
+              <span className="max-w-full truncate leading-tight">{label}</span>
             </Link>
           );
         })}
 
         <button
           onClick={onOpenQuickAdd}
-          className="ml-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition active:scale-95"
+          className="ml-1 flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition active:scale-95"
           aria-label="Add expense"
         >
           <Plus className="h-5 w-5" strokeWidth={2.75} />

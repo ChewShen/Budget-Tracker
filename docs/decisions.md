@@ -118,6 +118,13 @@ Each entry covers what was chosen, why, and what it costs. For what changed and 
 ### Goals net of trade-in and vouchers
 - **Why:** What you actually need to save for a new phone is its price minus the old phone's trade-in value and any vouchers still valid. Expired vouchers stop counting automatically. **Bought it** logs the real price as a one-off expense, so the goal and the spending stay consistent.
 
+### Instalments are bills that end
+- **Why:** Buying on instalments means a fixed amount leaves your account each month for N months. That's exactly a monthly bill with an end, and bills already have due days, "Due in 2 days / Overdue", reminders and auto-add. So a plan is a `recurring_sentinel` row with `installment_count` and `start_month` (and `goal_id` when bought from Goals), not a new kind of record.
+- **Spending is the payments, not the price:** Each payment counts in the month it's paid, so budgets, the forecast and the savings rate follow real cash flow. Logging the full price at purchase would make that month look terrible and the next ones too good. The down payment is a one-off expense on the day.
+- **One rule for "is it running this month":** `billActiveIn()` (`src/lib/instalments.ts`) is used by the Overview bills list (which feeds the forecast and budgets), reminders and local auto-add; the database's `auto_log_bills()` has the same condition. A plan never shows up before its first payment or after its last.
+- **What's owed is a debt:** Savings shows what's still owed and net worth after it, counted from when the plan was taken out, so past months aren't changed by a later purchase.
+- **Money in whole sen:** Plan terms are calculated in integer sen, because decimal ringgit in floating point can land just under a half sen and round the wrong way. The extra cost over paying upfront is the fees only, so a 0% plan never looks more expensive because of rounding.
+
 ### Budgets are one row per category
 - **Why:** A monthly limit per category (`UNIQUE (user_id, category_id)`) covers the common need without the complexity of per-month or rollover budgets. At-risk uses the same forecast rule as the Overview, so the two never disagree.
 

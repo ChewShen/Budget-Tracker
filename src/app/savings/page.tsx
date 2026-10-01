@@ -14,6 +14,7 @@ import { AccountChanges } from "@/components/account-changes";
 import { SavingsRateTrend } from "@/components/savings-rate-trend";
 import { formatCurrency } from "@/lib/utils";
 import { calculateSalaryMetrics, calculateUntrackedCash } from "@/lib/formulas";
+import { totalOwed } from "@/lib/instalments";
 import {
   accountsFor,
   averageMonthlySpend,
@@ -61,6 +62,7 @@ export default function SavingsPage() {
     setEmergencyMonths,
     goals,
     goalContributions,
+    bills,
   } = useBudget();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
 
@@ -123,6 +125,16 @@ export default function SavingsPage() {
   const hasAccounts = savingsAccounts.some((a) => !a.archived);
 
   const netWorth = current ? netWorthOf(current) : 0;
+  // Still owed on instalment plans at the end of the month (today for this month): a debt, so
+  // it's shown next to net worth, and net worth after it.
+  const todayIso = format(new Date(), "yyyy-MM-dd");
+  const monthEndIso = format(endOfMonth(monthDate), "yyyy-MM-dd");
+  const owed = totalOwed(
+    bills,
+    transactions,
+    monthEndIso < todayIso ? monthEndIso : todayIso,
+    (b) => goals.find((g) => g.id === b.goal_id)?.bought_at
+  );
 
   return (
     <div className="space-y-4 sm:space-y-5">
@@ -152,6 +164,15 @@ export default function SavingsPage() {
               Update balances
             </button>
           </div>
+          {owed > 0 && (
+            <p className="mt-2 text-sm text-muted-foreground">
+              <Link href="/settings/bills" className="underline decoration-border underline-offset-4 hover:text-foreground">
+                {formatCurrency(owed)} still owed on instalments
+              </Link>{" "}
+              · <span className="font-medium text-foreground tabular-nums">{formatCurrency(netWorth - owed)}</span> after
+              what you owe
+            </p>
+          )}
           {earmarked > 0 && (
             <p className="mt-2 text-sm text-muted-foreground">
               <Link href="/goals" className="underline decoration-border underline-offset-4 hover:text-foreground">

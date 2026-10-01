@@ -2,13 +2,14 @@
 
 import { useState } from "react";
 import { format, parseISO } from "date-fns";
-import { PartyPopper, Plus, Target } from "lucide-react";
+import { CalendarClock, PartyPopper, Plus, Target } from "lucide-react";
 import { useBudget } from "@/lib/budget-context";
 import { GoalCard } from "@/components/goal-card";
 import { GoalSheet } from "@/components/goal-sheet";
 import { BoughtSheet } from "@/components/bought-sheet";
-import { earmarkedTotal, goalProgress, netTarget } from "@/lib/goals";
-import { formatCurrency } from "@/lib/utils";
+import { earmarkedTotal, goalProgress, netTarget, savedFor } from "@/lib/goals";
+import { instalmentProgress } from "@/lib/instalments";
+import { formatCurrency, ordinal } from "@/lib/utils";
 import type { Goal } from "@/lib/types";
 
 export default function GoalsPage() {
@@ -22,6 +23,9 @@ export default function GoalsPage() {
     addContribution,
     deleteContribution,
     markGoalBought,
+    markGoalBoughtOnInstalments,
+    bills,
+    transactions,
     categories,
     tags,
     showToast,
@@ -31,9 +35,20 @@ export default function GoalsPage() {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
 
   const active = goals.filter((g) => g.status === "active").sort((a, b) => a.priority - b.priority);
-  const completed = goals
+  // Bought on instalments and not paid off yet: shown with the plan's progress until the last payment.
+  const planFor = (g: Goal) => {
+    const bill = bills.find((b) => b.goal_id === g.id && b.installment_count);
+    const progress = bill ? instalmentProgress(bill, transactions) : null;
+    return bill && progress ? { bill, progress } : null;
+  };
+  const bought = goals
     .filter((g) => g.status === "bought")
     .sort((a, b) => (b.bought_at || "").localeCompare(a.bought_at || ""));
+  const payingOff = bought.flatMap((g) => {
+    const plan = planFor(g);
+    return plan && !plan.progress.finished ? [{ goal: g, ...plan }] : [];
+  });
+  const completed = bought.filter((g) => !payingOff.some((p) => p.goal.id === g.id));
   const setAside = earmarkedTotal(goals, goalContributions);
   const stillToSave = active.reduce((sum, g) => sum + goalProgress(g, goalContributions).remaining, 0);
 
@@ -126,6 +141,42 @@ export default function GoalsPage() {
         })}
       </div>
 
+      {payingOff.length > 0 && (
+        <section className="card p-5 sm:p-6">
+          <h3 className="flex items-center gap-1.5 text-[15px] font-semibold">
+            <CalendarClock className="h-4 w-4" /> Paying off
+          </h3>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Bought on instalments. Each payment is a monthly bill until the last one.
+          </p>
+          <ul className="mt-4 space-y-4">
+            {payingOff.map(({ goal: g, bill, progress: p }) => {
+              const pct = p.total ? (p.paid / p.total) * 100 : 0;
+              return (
+                <li key={g.id}>
+                  <div className="flex items-baseline justify-between gap-3 text-sm">
+                    <span className="truncate font-medium">{g.name}</span>
+                    <span className="shrink-0 tabular-nums">
+                      {formatCurrency(p.owed)} <span className="text-xs text-muted-foreground">left</span>
+                    </span>
+                  </div>
+                  <div className="mt-2 h-1.5 rounded-full bg-secondary">
+                    <div className="h-full rounded-full bg-primary" style={{ width: `${pct}%` }} />
+                  </div>
+                  <div className="mt-1.5 flex flex-wrap justify-between gap-x-3 text-xs text-muted-foreground tabular-nums">
+                    <span>
+                      {p.paid} of {p.total} paid · {formatCurrency(p.monthly)}/month
+                      {bill.due_day ? ` on the ${ordinal(bill.due_day)}` : ""}
+                    </span>
+                    <span>Last payment {format(parseISO(`${p.lastMonth}-01`), "MMM yyyy")}</span>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+
       {completed.length > 0 && (
         <section className="card p-5 sm:p-6">
           <h3 className="text-[15px] font-semibold">Completed</h3>
@@ -148,9 +199,19 @@ export default function GoalsPage() {
         categories={categories}
         tags={tags}
         onClose={() => setBoughtGoal(null)}
+        setAside={boughtGoal ? savedFor(boughtGoal.id, goalContributions) : 0}
         onConfirm={async (goal, expense) => {
           const ok = await markGoalBought(goal.id, expense);
           if (ok) showToast({ tone: "default", message: `${goal.name} bought · logged as a one-off expense` });
+          return ok;
+        }}
+        onConfirmInstalments={async (goal, plan) => {
+          const ok = await markGoalBoughtOnInstalments(goal, plan);
+          if (ok)
+            showToast({
+              tone: "default",
+              message: `${goal.name}: ${formatCurrency(plan.monthly)} × ${plan.installment_count} added to Monthly bills`,
+            });
           return ok;
         }}
       />

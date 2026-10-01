@@ -15,6 +15,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.18.0] - 2026-10-01
+
+### Added
+- **Buy a goal on instalments**: Bought it → Instalments takes the price, a down payment (prefilled with what you set aside; clear it to keep that as free money), number of payments, optional interest/fees (default 0%), first payment month, due day and auto-add, and shows the monthly amount and what it costs over paying upfront. The goal moves to **Paying off** ("2 of 12 paid · RM 3,749.20 left · last payment Jul 2027") until the last payment.
+- **Instalment plans in Monthly bills**: a bill can end after a number of payments (Settings → Monthly bills → Instalment plan), with its progress shown.
+- **Savings shows what's still owed** on instalments and **net worth after what you owe**, counted from when each plan was taken out.
+
+### Changed
+- The month-end forecast, budgets, reminders and auto-add count an instalment plan only from its first payment to its last.
+
+### Fixed
+- On iPhone, date fields no longer spill into the field next to them (e.g. Add expense's date over One-off).
+- Bottom tabs on phones: every tab shows its icon over a label, evenly spaced, instead of a cramped label beside the active one.
+
+### Database
+- New migration `scripts/migrations/2026-10-01_instalments.sql`: plan columns on monthly bills (number of payments, first payment month, linked goal, price, down payment), an ownership check for the linked goal, and the daily auto-add job skipping plans outside their months.
+
+---
+
 ## [0.17.1] - 2026-10-01
 
 ### Fixed
