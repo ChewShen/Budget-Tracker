@@ -233,18 +233,29 @@ export function QuickAddModal({
         {/* Grabber (mobile) */}
         <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-border sm:hidden" />
 
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
           <h2 className="text-[15px] font-semibold">{title}</h2>
-          <button
-            onClick={onClose}
-            className="-mr-1.5 rounded-full p-2 text-muted-foreground transition hover:bg-secondary hover:text-foreground"
-            aria-label="Close"
-          >
-            <X className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-1">
+            {/* Save without scrolling past the tags and numpad (same as the big button below). */}
+            <button
+              type="submit"
+              form="quick-add-form"
+              disabled={!parseFloat(amountStr) || isSubmitting}
+              className="rounded-full bg-primary px-4 py-1.5 text-sm font-semibold text-primary-foreground transition hover:brightness-95 active:scale-[0.97] disabled:opacity-40"
+            >
+              Save
+            </button>
+            <button
+              onClick={onClose}
+              className="-mr-1.5 rounded-full p-2 text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+              aria-label="Close"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="mt-2 space-y-5 pb-5">
+        <form id="quick-add-form" onSubmit={handleSubmit} className="mt-2 space-y-5 pb-5">
           {/* Amount */}
           <div className="py-3 text-center">
             <div className="flex items-baseline justify-center gap-2">
