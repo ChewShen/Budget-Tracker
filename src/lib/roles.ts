@@ -42,5 +42,7 @@ export function mealTag(categories: Category[], tags: Tag[], meal: MealRole): Ta
 export function roleDescription(role: Category["role"] | Tag["role"]): string | null {
   if (role === "food") return "Used for the Food & dining card and meal suggestions";
   const meal = MEAL_ROLES.find((m) => m.role === role);
-  return meal ? `Suggested in Add expense at ${meal.label}` : null;
+  if (!meal) return null;
+  const endsDay = role === "dinner" || role === "supper" ? `, and moves "Same as last entry" to the next day` : "";
+  return `Suggested in Add expense at ${meal.label}${endsDay}`;
 }

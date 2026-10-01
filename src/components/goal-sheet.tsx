@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils";
 import { discountAmount, isExpired } from "@/lib/goals";
 import type { GoalInput } from "@/lib/budget-context";
+import { DateField } from "@/components/date-field";
 import type { Goal, GoalDiscount } from "@/lib/types";
 
 // Editable discount row (value kept as text while typing).
@@ -162,16 +163,12 @@ export function GoalSheet({ isOpen, goal, onClose, onSave, onDelete }: GoalSheet
                 aria-label="Price"
               />
             </label>
-            <label className="block">
+            <div>
               <span className="text-xs text-muted-foreground">Target date (optional)</span>
-              <input
-                type="date"
-                value={targetDate}
-                onChange={(e) => setTargetDate(e.target.value)}
-                className="field mt-1"
-                aria-label="Target date"
-              />
-            </label>
+              <div className="mt-1">
+                <DateField value={targetDate} onChange={setTargetDate} label="Target date" />
+              </div>
+            </div>
           </div>
 
           <div className="rounded-xl border p-3.5">
@@ -263,7 +260,7 @@ export function GoalSheet({ isOpen, goal, onClose, onSave, onDelete }: GoalSheet
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
-                    <div className="col-span-2 grid grid-cols-[auto_1fr_1fr] gap-2">
+                    <div className="col-span-2 grid grid-cols-[auto_1fr] gap-2">
                       <div className="flex rounded-xl border border-input p-0.5 text-xs font-medium" role="radiogroup" aria-label={`Discount ${i + 1} type`}>
                         {(["amount", "percent"] as const).map((k) => (
                           <button
@@ -289,14 +286,18 @@ export function GoalSheet({ isOpen, goal, onClose, onSave, onDelete }: GoalSheet
                         className="field py-2 tabular-nums"
                         aria-label={`Discount ${i + 1} value`}
                       />
-                      <input
-                        type="date"
-                        value={d.expires_on}
-                        onChange={(e) => updateRow(d.id, { expires_on: e.target.value })}
-                        className="field py-2 text-xs"
-                        aria-label={`Discount ${i + 1} expiry date (optional)`}
-                        title="Expiry date (optional)"
-                      />
+                    </div>
+                    <div className="col-span-2 flex items-center gap-2">
+                      <span className="shrink-0 text-xs text-muted-foreground">Expires</span>
+                      <div className="flex-1">
+                        <DateField
+                          value={d.expires_on}
+                          onChange={(v) => updateRow(d.id, { expires_on: v })}
+                          label={`Discount ${i + 1} expiry date`}
+                          title="Expiry date (optional)"
+                          className="py-2 text-xs"
+                        />
+                      </div>
                     </div>
                   </li>
                 ))}
