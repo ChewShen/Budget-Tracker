@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { ExportMenu } from "@/components/export-menu";
-import { format, getDaysInMonth, parse, subMonths } from "date-fns";
+import { addMonths, format, getDaysInMonth, parse, subMonths } from "date-fns";
 import { useBudget } from "@/lib/budget-context";
 import { MonthSelector } from "@/components/month-selector";
 import { KpiCards } from "@/components/kpi-cards";
@@ -259,8 +259,12 @@ export default function DashboardPage() {
     : [];
   const insights = [...budgetInsight, ...monthInsights(transactions, selectedMonth, todayStr, 3)].slice(0, 3);
 
-  // 9. Monthly trend ending at the selected month; average over completed months only.
-  const trend = monthlyTotals(transactions, selectedMonth).map((m) => {
+  // 9. Monthly trend: 6 months around the selected one, running up to 2 months past it (never
+  //    beyond this month), so picking an older bar keeps the months after it on screen.
+  //    Average over completed months only.
+  const twoAfter = format(addMonths(monthDate, 2), "yyyy-MM");
+  const trendEnd = selectedMonth >= currentMonthStr ? selectedMonth : twoAfter < currentMonthStr ? twoAfter : currentMonthStr;
+  const trend = monthlyTotals(transactions, trendEnd, 6, selectedMonth).map((m) => {
     const projectedRest = forecast && m.month === selectedMonth ? Math.max(0, forecast.projected - m.total) : 0;
     return { ...m, projectedRest, projectedTotal: m.total + projectedRest };
   });

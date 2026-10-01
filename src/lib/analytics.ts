@@ -85,14 +85,17 @@ export interface MonthTotal {
 
 // Totals for up to `n` months ending at `endMonth`, oldest first, starting from the first
 // month that has any data (so there are no empty months before your history begins).
-export function monthlyTotals(txs: Transaction[], endMonth: string, n = 6): MonthTotal[] {
+// Leading empty months are dropped (before the first expense), except `keep` (the selected month).
+export function monthlyTotals(txs: Transaction[], endMonth: string, n = 6, keep?: string): MonthTotal[] {
   const months = [endMonth, ...monthsBefore(endMonth, n - 1)].reverse();
   const totals = months.map((month) => ({
     month,
     total: sumAmounts(txs.filter((t) => t.date.startsWith(month))),
   }));
-  const first = totals.findIndex((m) => m.total > 0);
-  return first === -1 ? totals.slice(-1) : totals.slice(first);
+  const firstSpend = totals.findIndex((m) => m.total > 0);
+  const kept = keep ? totals.findIndex((m) => m.month === keep) : -1;
+  const first = [firstSpend, kept].filter((i) => i >= 0);
+  return first.length ? totals.slice(Math.min(...first)) : totals.slice(-1);
 }
 
 export interface Insight {
