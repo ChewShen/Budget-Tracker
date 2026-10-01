@@ -15,6 +15,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.18.1] - 2026-10-01
+
+### Added
+- **Save button at the top of Add expense**, next to the close button, so saving doesn't need a scroll past the tags and numpad. The big button at the bottom stays.
+
+### Fixed
+- **The page behind an open sheet no longer scrolls** (Add expense, Bought it, goals, balances): on iPhone a swipe could scroll the page underneath instead of the sheet. The page now stays put and returns to the same spot when the sheet closes.
+- On iPhone, the **First payment** month picker in Bought it → Instalments no longer overlaps **Due on** (month and time pickers get the same width fix as date fields).
+
+---
+
 ## [0.18.0] - 2026-10-01
 
 ### Added
