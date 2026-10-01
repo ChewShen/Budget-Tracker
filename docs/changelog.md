@@ -15,6 +15,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.17.0] - 2026-10-01
+
+### Added
+- **Transactions shows 50 expenses at a time**, with "Showing 50 of N" and a **Show 50 more** button, so the All view stays fast with thousands of expenses. Search, category filters and day totals still cover every expense.
+
+### Changed
+- **Monthly spending** (Overview) keeps the months after the one you pick: the chart runs up to 2 months past the selected month (never beyond this month) instead of always ending at it. The selected month stays visible even before your first expense.
+
+### Fixed
+- **Every expense is loaded**, not just the newest 1,000. Supabase caps each request at 1,000 rows, so older expenses would have silently dropped out of totals, trends and year to date; they're now fetched in batches until none are left.
+
+---
+
 ## [0.16.0] - 2026-10-01
 
 ### Added

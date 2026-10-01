@@ -90,6 +90,7 @@ export default function TransactionsPage() {
       </div>
 
       <LedgerTable
+        key={filterByMonth ? selectedMonth : "all"} // start from the first 50 again when the view changes
         transactions={displayedTransactions}
         onDeleteTransaction={deleteTransaction}
       />
