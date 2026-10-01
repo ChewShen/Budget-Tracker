@@ -11,7 +11,8 @@ const DATE_OPTIONS: { value: DefaultDateMode; label: string; description: string
   {
     value: "last",
     label: "Same as last entry",
-    description: "Keep the date you used last time. Handy when catching up on a past day.",
+    description:
+      "Keep the date you used last time, and move to the next day once that day has a dinner or supper entry. Handy when catching up on past days in order.",
   },
 ];
 

@@ -15,6 +15,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.16.0] - 2026-10-01
+
+### Added
+- **Settings shows the app version** under the section list, with a "What's new" link to this changelog.
+- Goal cards show the **year** on voucher expiry and trade-in dates ("expires 11 Dec 2026").
+
+### Changed
+- **"Same as last entry"** (Settings → General) now follows you through a catch-up session: Add expense stays on the date you last used until that day has a Dinner or Supper entry, then opens on the next day, never later than today. Works with renamed meal tags (the ★ ones).
+- The **settings button closes Settings** when it's open, going back to the page you opened it from.
+
+### Fixed
+- A goal's target date and a voucher's expiry can be **cleared** once set (the date picker on iPhone had no way to remove one).
+
+---
+
 ## [0.15.0] - 2026-09-30
 
 ### Added

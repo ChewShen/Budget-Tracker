@@ -8,7 +8,7 @@ import { formatCurrency } from "@/lib/utils";
 import { Category, Transaction } from "@/lib/types";
 import { useBudget, type NewTransaction } from "@/lib/budget-context";
 import { foodCategory, mealForHour, mealTag } from "@/lib/roles";
-import { getDefaultDateMode, getLastEntryDate, setLastEntryDate } from "@/lib/preferences";
+import { defaultEntryDate, getDefaultDateMode, getLastEntryDate, setLastEntryDate } from "@/lib/preferences";
 
 
 const RECENT_DAYS = 90;
@@ -94,7 +94,15 @@ export function QuickAddModal({
     setDescription("");
     setIsOneOff(false);
     const today = format(new Date(), "yyyy-MM-dd");
-    setSelectedDate(getDefaultDateMode() === "last" ? getLastEntryDate() || today : today);
+    setSelectedDate(
+      defaultEntryDate({
+        mode: getDefaultDateMode(),
+        today,
+        lastEntryDate: getLastEntryDate(),
+        eveningTagIds: (["dinner", "supper"] as const).flatMap((m) => mealTag(categories, tags, m)?.id ?? []),
+        transactions,
+      })
+    );
 
     // The meal tag for the time of day (e.g. lunch at 1pm), found by its mark so renaming is fine.
     const food = foodCategory(categories);

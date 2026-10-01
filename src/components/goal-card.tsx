@@ -22,7 +22,7 @@ interface GoalCardProps {
 
 const QUICK = [50, 100, 200, 500];
 const monthName = (ym: string) => format(parseISO(`${ym}-01`), "MMM yyyy");
-const dayName = (d: string) => format(parseISO(d), "d MMM");
+const dayName = (d: string) => format(parseISO(d), "d MMM yyyy");
 
 function PaceLine({ goal, p }: { goal: Goal; p: GoalProgress }) {
   if (p.isReady) return <span className="font-medium text-success">Ready: you&apos;ve saved enough.</span>;
