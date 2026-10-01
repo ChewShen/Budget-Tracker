@@ -1,5 +1,6 @@
 import { format, getDaysInMonth, parseISO } from "date-fns";
 import { RecurringBill, Tag, Transaction } from "./types";
+import { billActiveIn } from "./instalments";
 
 export const AUTO_BILL_NOTE = "Auto-added monthly bill";
 
@@ -25,6 +26,7 @@ export function dueAutoBills(
   const month = todayStr.slice(0, 7);
   return bills.flatMap((bill) => {
     if (!bill.is_active || !bill.auto_log || !bill.expected_amount || !bill.due_day) return [];
+    if (!billActiveIn(bill, month)) return []; // instalment plan not running this month
     const tag = tags.find((t) => t.id === bill.tag_id);
     const date = dueDateIn(month, bill.due_day);
     if (!tag || date > todayStr) return [];

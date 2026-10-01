@@ -19,3 +19,10 @@ export function formatDateDisplay(dateStr: string): string {
   if (!dateStr) return "";
   return format(parseISO(dateStr), "d MMM yyyy");
 }
+
+// 1 → "1st", 22 → "22nd", 13 → "13th" (due days).
+export function ordinal(n: number): string {
+  const s = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return `${n}${s[(v - 20) % 10] || s[v] || s[0]}`;
+}

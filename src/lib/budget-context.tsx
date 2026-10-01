@@ -48,7 +48,32 @@ export type GoalInput = Pick<
   "name" | "target_amount" | "trade_in_name" | "trade_in_value" | "trade_in_updated" | "target_date" | "link" | "discounts"
 >;
 
-export type BillChanges = Partial<Pick<RecurringBill, "expected_amount" | "due_day" | "is_active" | "auto_log">>;
+export type BillChanges = Partial<
+  Pick<
+    RecurringBill,
+    | "expected_amount"
+    | "due_day"
+    | "is_active"
+    | "auto_log"
+    | "installment_count"
+    | "start_month"
+    | "goal_id"
+    | "cash_price"
+    | "down_payment"
+  >
+>;
+
+// Bought a goal on instalments: the monthly plan, plus the down payment paid today (if any).
+export interface InstalmentPurchase {
+  category_id: string; // where the monthly payments are filed (their tag is created in it)
+  monthly: number;
+  installment_count: number;
+  start_month: string; // YYYY-MM-01
+  due_day: number;
+  auto_log: boolean;
+  cash_price: number;
+  downPayment: NewTransaction | null; // logged as a one-off expense today
+}
 
 
 export interface Toast {
@@ -107,7 +132,9 @@ interface BudgetContextType {
   addContribution: (goalId: string, amount: number, note?: string) => Promise<boolean>;
   deleteContribution: (id: string) => Promise<boolean>;
   markGoalBought: (goalId: string, expense: NewTransaction) => Promise<boolean>;
-  addBill: (tagId: string, changes?: BillChanges) => Promise<boolean>;
+  // Creates the plan (a monthly bill that ends) and moves the goal to bought.
+  markGoalBoughtOnInstalments: (goal: Goal, plan: InstalmentPurchase) => Promise<boolean>;
+  addBill: (tagId: string, changes?: BillChanges) => Promise<RecurringBill | null>;
   updateBill: (id: string, changes: BillChanges) => Promise<boolean>;
   removeBill: (id: string) => Promise<boolean>;
   addCategory: (name: string, icon: string) => Promise<Category | null>;
@@ -354,6 +381,11 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
           expected_amount: b.expected_amount == null ? null : Number(b.expected_amount),
           due_day: b.due_day ?? null,
           auto_log: Boolean(b.auto_log),
+          installment_count: b.installment_count ?? null,
+          start_month: b.start_month ?? null,
+          goal_id: b.goal_id ?? null,
+          cash_price: b.cash_price == null ? null : Number(b.cash_price),
+          down_payment: b.down_payment == null ? null : Number(b.down_payment),
         }))
       );
       if (prof.data) {
@@ -738,17 +770,17 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
   // ---- Monthly bills (recurring_sentinel) ----
   const billError = (error: { code?: string }) =>
     error.code === "42703" || error.code === "PGRST204"
-      ? "Run the monthly bills migrations (scripts/migrations/) in Supabase first."
+      ? "Run the latest migrations in scripts/migrations/ in Supabase first (instalments need 2026-10-01_instalments.sql)."
       : error.code === "23514"
         ? "Auto-add needs an expected amount and a due day."
       : error.code === "23505"
         ? "That tag is already a monthly bill."
         : "Couldn't save the bill.";
 
-  const addBill = async (tagId: string, changes: BillChanges = {}) => {
+  const addBill = async (tagId: string, changes: BillChanges = {}): Promise<RecurringBill | null> => {
     if (bills.some((b) => b.tag_id === tagId)) {
       showToast({ tone: "error", message: "That tag is already a monthly bill." });
-      return false;
+      return null;
     }
     let created: RecurringBill = { id: `bill-${Date.now()}`, tag_id: tagId, is_active: true, ...changes };
     if (isCloud) {
@@ -760,12 +792,17 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
       if (error || !data) {
         console.error("Supabase bill insert error:", error);
         showToast({ tone: "error", message: billError(error || {}) });
-        return false;
+        return null;
       }
-      created = { ...data, expected_amount: data.expected_amount == null ? null : Number(data.expected_amount) };
+      created = {
+        ...data,
+        expected_amount: data.expected_amount == null ? null : Number(data.expected_amount),
+        cash_price: data.cash_price == null ? null : Number(data.cash_price),
+        down_payment: data.down_payment == null ? null : Number(data.down_payment),
+      };
     }
     setBills((prev) => [...prev, created]);
-    return true;
+    return created;
   };
 
   const updateBill = async (id: string, changes: BillChanges) => {
@@ -933,6 +970,37 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
     const ok = await updateGoal(goalId, { status: "bought", bought_at: expense.date });
     if (!ok) return false;
     await addTransaction({ ...expense, is_one_off: true });
+    return true;
+  };
+
+  const markGoalBoughtOnInstalments = async (goal: Goal, plan: InstalmentPurchase) => {
+    // The plan gets its own tag ("iPhone 17 Pro instalment"), so its payments are easy to find
+    // and a month counts as paid when an expense with that tag is logged in it.
+    const base = `${goal.name} instalment`.slice(0, 40);
+    const taken = (n: string) =>
+      tags.some((t) => t.category_id === plan.category_id && t.name.toLowerCase() === n.toLowerCase());
+    let name = base;
+    for (let i = 2; taken(name); i++) name = `${base.slice(0, 36)} ${i}`;
+    const tag = await addTag(plan.category_id, name);
+    if (!tag) return false;
+
+    const bill = await addBill(tag.id, {
+      expected_amount: plan.monthly,
+      due_day: plan.due_day,
+      auto_log: plan.auto_log,
+      installment_count: plan.installment_count,
+      start_month: plan.start_month,
+      goal_id: goal.id,
+      cash_price: plan.cash_price,
+      down_payment: plan.downPayment?.amount ?? 0,
+    });
+    if (!bill) return false;
+
+    const today = format(new Date(), "yyyy-MM-dd");
+    if (!(await updateGoal(goal.id, { status: "bought", bought_at: plan.downPayment?.date ?? today }))) return false;
+    // Money set aside for the goal stops being earmarked once it's bought; the down payment
+    // (prefilled with that amount) is what actually leaves your account today.
+    if (plan.downPayment && plan.downPayment.amount > 0) await addTransaction({ ...plan.downPayment, is_one_off: true });
     return true;
   };
 
@@ -1167,6 +1235,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
         addContribution,
         deleteContribution,
         markGoalBought,
+        markGoalBoughtOnInstalments,
         addBill,
         updateBill,
         removeBill,

@@ -11,6 +11,7 @@ import { SpendHero } from "@/components/spend-hero";
 import { SalaryEngine } from "@/components/salary-engine";
 import { RecurringSentinel, type BillStatus } from "@/components/recurring-sentinel";
 import { canAutoLog } from "@/lib/bills";
+import { billActiveIn } from "@/lib/instalments";
 import { categoryLabel } from "@/lib/categories";
 import { foodCategory } from "@/lib/roles";
 import { formatCurrency } from "@/lib/utils";
@@ -149,8 +150,10 @@ export default function DashboardPage() {
   const dayStr = (day: number) =>
     `${selectedMonth}-${String(Math.min(day, daysInSelectedMonth)).padStart(2, "0")}`;
 
+  // Instalment plans only count in their own months, so the forecast, budgets and this list
+  // include a plan's payment from its first month to its last, and not after.
   const billRows = bills
-    .filter((b) => b.is_active)
+    .filter((b) => b.is_active && billActiveIn(b, selectedMonth))
     .flatMap((bill) => {
       const tag = tags.find((t) => t.id === bill.tag_id);
       if (!tag) return [];
