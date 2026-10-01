@@ -47,6 +47,7 @@ Guest mode never touches the database and stores nothing in your browser, so **n
 ### 🧾 Monthly bills
 - Choose which tags are monthly bills, with an optional **expected amount** and **due day**.
 - Overview shows **Logged / Due in 2 days / Overdue / Missing**, and logs unpaid bills in one tap.
+- **Instalment plans** are bills that end: they only count (forecast, budgets, reminders, auto-add) from the first payment to the last.
 - **Auto-add** fixed bills on their due day via a daily **pg_cron** job in Postgres.
 
 ### 🚦 Budgets & reminders
@@ -63,6 +64,7 @@ Guest mode never touches the database and stores nothing in your browser, so **n
 - Save toward things you want: progress, "set aside RM X/month to make it by <date>" with **on track / behind**, or when you'll be ready at your pace.
 - **Trade-in value** and **discounts & vouchers** (RM or %, with expiry dates) come off the target; expiring vouchers are flagged, expired ones stop counting.
 - **Bought it** logs what you paid as a one-off expense; money set aside for goals is kept separate from your emergency fund.
+- **Bought on instalments** (Atome, SPayLater, 0% card plans…): down payment (prefilled with what you set aside), number of payments and optional interest/fees. Each payment becomes a monthly bill that ends after the last one, with reminders and auto-add; the goal shows **Paying off: 2 of 12 paid · RM 3,749 left**, and Savings shows what's still owed and **net worth after what you owe**.
 
 ### 🔐 Data & privacy
 - **Email + password sign-in**, no public sign-up; every table locked with owner-only **Row-Level Security**.
@@ -233,6 +235,7 @@ One-off SQL changes for existing databases live in [`scripts/migrations/`](scrip
 - `2026-09-30_multi_user.sql`: each account gets its own categories and tags (existing ones stay yours), category names are unique per account, expenses/bills/budgets can only use your own categories and tags, and new accounts start with a profile and a default set of categories and tags. See [Adding a friend](#adding-a-friend). After this, `secure_rls.sql` refuses to run (it would re-open categories and tags).
 - `2026-09-30_roles.sql`: marks each account's food category and meal tags (breakfast, lunch, tea time, dinner, late night) so the Food & dining card and the time-of-day tag in Add expense keep working after renames; new accounts also get a Supper tag. Starred in Settings → Categories & tags.
 - `2026-09-30_savings_accounts.sql`: savings become per-person accounts (`savings_accounts`) with a month-end balance each (`savings_balances`) instead of the fixed Main checking / GXBank / RYT / EPF columns. Your history is copied over (same account names, net worth per month unchanged; the last query shows before/after); `monthly_savings` is kept as a backup.
+- `2026-10-01_instalments.sql`: instalment plans on monthly bills (number of payments, first payment month, linked goal, price and down payment), owner checks for the linked goal, and the daily auto-add job skipping plans outside their months.
 
 ### Adding a friend
 Sign-up stays off, so strangers can't create accounts. To give someone their own account:

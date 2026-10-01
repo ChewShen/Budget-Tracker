@@ -1,5 +1,6 @@
 import { addDays, format, getDaysInMonth, parseISO } from "date-fns";
 import { dueDateIn } from "./bills";
+import { billActiveIn } from "./instalments";
 import { daysToExpiry } from "./goals";
 import { formatCurrency } from "./utils";
 import type { Budget, Category, Goal, RecurringBill, Tag, Transaction } from "./types";
@@ -61,8 +62,9 @@ function billReminders({ today, bills, tags, transactions }: ReminderData): Remi
     const amount = bill.expected_amount ? ` · ${formatCurrency(bill.expected_amount)}` : "";
 
     // Due tomorrow (tomorrow can be in next month).
+    // Instalment plans only remind in their own months (first to last payment).
     const nextDue = dueDateIn(tomorrow.slice(0, 7), bill.due_day);
-    if (nextDue === tomorrow && !paidIn(tag.id, tomorrow.slice(0, 7)))
+    if (nextDue === tomorrow && billActiveIn(bill, tomorrow.slice(0, 7)) && !paidIn(tag.id, tomorrow.slice(0, 7)))
       return [
         {
           key: `bill:${tag.id}:${nextDue}:soon`,
@@ -75,7 +77,7 @@ function billReminders({ today, bills, tags, transactions }: ReminderData): Remi
 
     // Overdue this month and still not logged: once per month.
     const due = dueDateIn(month, bill.due_day);
-    if (due < today && !paidIn(tag.id, month))
+    if (due < today && billActiveIn(bill, month) && !paidIn(tag.id, month))
       return [
         {
           key: `bill:${tag.id}:${due}:overdue`,

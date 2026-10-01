@@ -20,6 +20,13 @@ export interface RecurringBill {
   expected_amount?: number | null; // used by "Log missing bills" instead of last month's amount
   due_day?: number | null; // 1-31, clamped to the month's length
   auto_log?: boolean; // added automatically on the due day (needs expected_amount + due_day)
+  // Instalment plan: a bill that runs for installment_count months from start_month, then ends.
+  // expected_amount is the monthly payment. Ongoing bills leave these empty.
+  installment_count?: number | null;
+  start_month?: string | null; // YYYY-MM-01, first payment
+  goal_id?: string | null; // the goal it paid for, if bought from Goals
+  cash_price?: number | null; // price if paid upfront (to show what the plan costs extra)
+  down_payment?: number | null; // paid at purchase, logged as a one-off expense
 }
 
 export interface Budget {

@@ -46,6 +46,8 @@ async function loadData(db: SupabaseClient, userId: string, today: string): Prom
       expected_amount: b.expected_amount == null ? null : Number(b.expected_amount),
       due_day: b.due_day ?? null,
       auto_log: Boolean(b.auto_log),
+      installment_count: b.installment_count ?? null,
+      start_month: b.start_month ?? null,
     })),
     budgets: (bgs.data || []).map((b: any) => ({ ...b, monthly_limit: Number(b.monthly_limit) })),
     goals: (gls.data || []).map((g: any) => ({

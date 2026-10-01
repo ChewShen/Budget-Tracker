@@ -12,7 +12,7 @@ const TAXONOMY: Record<string, string[]> = {
   Transport: ["Petrol", "Parking", "Toll", "Grab", "Season Parking"],
   Home_Bills: ["Electric", "Water", "Internet", "Phone"],
   Subscription: ["Netflix", "Spotify", "iCloud"],
-  Shopping: ["Clothes", "Household"],
+  Shopping: ["Clothes", "Household", "MacBook Air instalment"],
   Health: ["Clinic", "Pharmacy"],
   Entertainment: ["Movie", "Games"],
   Self_care: ["Haircut", "Skincare"],
@@ -54,14 +54,36 @@ const BILLS: [string, number | null, number, boolean][] = [
   ["Water", null, 22, false],
 ];
 
-export const INITIAL_BILLS: RecurringBill[] = BILLS.map(([name, amount, due, auto]) => ({
-  id: `bill-${tag(name).id}`,
-  tag_id: tag(name).id,
-  is_active: true,
-  expected_amount: amount,
-  due_day: due,
-  auto_log: auto,
-}));
+// An instalment plan: a laptop bought two months ago, RM 500 down and 12 payments on the 6th.
+const PLAN = { tag: "MacBook Air instalment", price: 4999, down: 500, monthly: 374.92, payments: 12, dueDay: 6 };
+const monthStart = (back: number, today = new Date()) => {
+  const d = new Date(today.getFullYear(), today.getMonth() - back, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+};
+
+export const INITIAL_BILLS: RecurringBill[] = [
+  ...BILLS.map(([name, amount, due, auto]) => ({
+    id: `bill-${tag(name).id}`,
+    tag_id: tag(name).id,
+    is_active: true,
+    expected_amount: amount,
+    due_day: due,
+    auto_log: auto,
+  })),
+  {
+    id: "bill-plan-macbook",
+    tag_id: tag(PLAN.tag).id,
+    is_active: true,
+    expected_amount: PLAN.monthly,
+    due_day: PLAN.dueDay,
+    auto_log: true,
+    installment_count: PLAN.payments,
+    start_month: monthStart(2),
+    goal_id: "goal-macbook",
+    cash_price: PLAN.price,
+    down_payment: PLAN.down,
+  },
+];
 
 // ---- Monthly budgets (a mix that ends up under, close to, and over) ----
 
@@ -144,6 +166,12 @@ function buildTransactions(today: Date): Transaction[] {
       if (d === 14) add(date, "Haircut", 25);
       if (d === 16 && r() < 0.5) add(date, "Books", between(30, 60));
 
+      // The laptop plan: down payment the day it was bought, then one payment a month.
+      if (d === PLAN.dueDay) {
+        if (back === 2) add(date, "Household", PLAN.down, { is_one_off: true, description: "MacBook Air (down payment)" });
+        add(date, PLAN.tag, PLAN.monthly);
+      }
+
       // Bills on their due day.
       for (const [name, amount, due] of BILLS) {
         if (d !== due) continue;
@@ -199,6 +227,18 @@ function buildGoals(today: Date): { goals: Goal[]; contributions: GoalContributi
       link: null,
       priority: 0,
       status: "active",
+    },
+    {
+      id: "goal-macbook",
+      name: "MacBook Air",
+      target_amount: PLAN.price,
+      trade_in_value: 0,
+      discounts: [],
+      target_date: null,
+      link: null,
+      priority: 2,
+      status: "bought",
+      bought_at: day(-2, PLAN.dueDay),
     },
     {
       id: "goal-japan",

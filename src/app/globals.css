@@ -108,6 +108,17 @@
   input[type="number"] {
     -moz-appearance: textfield;
   }
+
+  /* iPhone Safari gives date inputs a built-in minimum width and ignores the column they're in,
+     so in a two-column row they spill into the next field. Let them shrink like other inputs. */
+  input[type="date"] {
+    min-width: 0;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  input[type="date"]::-webkit-date-and-time-value {
+    text-align: left;
+  }
 }
 
 @layer components {

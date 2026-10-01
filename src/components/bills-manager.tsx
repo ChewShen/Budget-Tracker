@@ -1,20 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Repeat, Trash2 } from "lucide-react";
-import { format } from "date-fns";
+import { CalendarClock, Plus, Repeat, Trash2 } from "lucide-react";
+import { addMonths, format, parseISO } from "date-fns";
 import { useBudget } from "@/lib/budget-context";
 import { categoryLabel } from "@/lib/categories";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, ordinal } from "@/lib/utils";
 import { RecurringBill } from "@/lib/types";
 import { dueDateIn } from "@/lib/bills";
+import { instalmentProgress, isInstalment } from "@/lib/instalments";
 
 const DAYS = Array.from({ length: 31 }, (_, i) => i + 1);
-const ordinal = (n: number) => {
-  const s = ["th", "st", "nd", "rd"];
-  const v = n % 100;
-  return `${n}${s[(v - 20) % 10] || s[v] || s[0]}`;
-};
 const toAmount = (text: string) => {
   const n = parseFloat(text);
   return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null;
@@ -32,7 +28,15 @@ function BillForm({
   const [amount, setAmount] = useState(bill?.expected_amount ? String(bill.expected_amount) : "");
   const [dueDay, setDueDay] = useState(bill?.due_day ? String(bill.due_day) : "");
   const [autoLog, setAutoLog] = useState(Boolean(bill?.auto_log));
+  // Instalment plan: ends after a number of payments (needs an amount and a due day, like auto-add).
+  const [isPlan, setIsPlan] = useState(bill ? isInstalment(bill) : false);
+  const [payments, setPayments] = useState(bill?.installment_count ? String(bill.installment_count) : "12");
+  const [firstMonth, setFirstMonth] = useState(
+    bill?.start_month ? bill.start_month.slice(0, 7) : format(addMonths(new Date(), 1), "yyyy-MM")
+  );
   const canAuto = toAmount(amount) !== null && Boolean(dueDay);
+  const paymentCount = Math.floor(Number(payments) || 0);
+  const planValid = !isPlan || (canAuto && paymentCount >= 1 && paymentCount <= 120 && Boolean(firstMonth));
 
   // Turning auto-add on after this month's due day: say when this month's expense will appear.
   const thisMonth = format(new Date(), "yyyy-MM");
@@ -50,10 +54,13 @@ function BillForm({
     e.preventDefault();
     if (!tagId) return;
     setIsBusy(true);
+    if (!planValid) return;
     const changes = {
       expected_amount: toAmount(amount),
       due_day: dueDay ? Number(dueDay) : null,
       auto_log: autoLog && canAuto,
+      installment_count: isPlan ? paymentCount : null,
+      start_month: isPlan ? `${firstMonth}-01` : null,
     };
     const ok = bill ? await updateBill(bill.id, changes) : await addBill(tagId, changes);
     setIsBusy(false);
@@ -132,6 +139,59 @@ function BillForm({
           />
         </span>
       </button>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={isPlan}
+        onClick={() => setIsPlan((v) => !v)}
+        className="flex w-full items-center justify-between gap-3 rounded-xl border px-3.5 py-3 text-left transition"
+      >
+        <span>
+          <span className="block text-sm font-medium">Instalment plan</span>
+          <span className="block text-xs text-muted-foreground">
+            Ends after a number of payments, like a phone on Atome or a 0% card plan.
+          </span>
+        </span>
+        <span className={`relative h-5 w-9 shrink-0 rounded-full transition ${isPlan ? "bg-primary" : "bg-secondary"}`}>
+          <span
+            className={`absolute top-0.5 h-4 w-4 rounded-full bg-background shadow transition-all ${isPlan ? "left-[18px]" : "left-0.5"}`}
+          />
+        </span>
+      </button>
+      {isPlan && (
+        <div className="grid grid-cols-2 gap-3">
+          <label className="block">
+            <span className="text-xs text-muted-foreground">Number of payments</span>
+            <input
+              inputMode="numeric"
+              value={payments}
+              onChange={(e) => /^\d{0,3}$/.test(e.target.value) && setPayments(e.target.value)}
+              className="field mt-1 tabular-nums"
+              aria-label="Number of payments"
+            />
+          </label>
+          <label className="block">
+            <span className="text-xs text-muted-foreground">First payment</span>
+            <input
+              type="month"
+              value={firstMonth}
+              onChange={(e) => setFirstMonth(e.target.value)}
+              className="field mt-1"
+              aria-label="First payment month"
+            />
+          </label>
+          {!canAuto && (
+            <p className="col-span-2 text-xs text-danger">A plan needs an expected amount and a due day.</p>
+          )}
+          {canAuto && paymentCount >= 1 && firstMonth && (
+            <p className="col-span-2 text-xs text-muted-foreground tabular-nums">
+              {formatCurrency(toAmount(amount) as number)} × {paymentCount} ={" "}
+              {formatCurrency((toAmount(amount) as number) * paymentCount)}, last payment{" "}
+              {format(addMonths(parseISO(`${firstMonth}-01`), paymentCount - 1), "MMM yyyy")}.
+            </p>
+          )}
+        </div>
+      )}
       {pastDueUnpaid && (
         <p className="text-xs text-muted-foreground">
           This month&apos;s is already due, so it will be added{" "}
@@ -157,7 +217,7 @@ function BillForm({
         </button>
         <button
           type="submit"
-          disabled={isBusy || !tagId}
+          disabled={isBusy || !tagId || !planValid}
           className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:brightness-95 disabled:opacity-40"
         >
           {bill ? "Save" : "Add bill"}
@@ -168,14 +228,19 @@ function BillForm({
 }
 
 export function BillsManager({ showTitle = true }: { showTitle?: boolean }) {
-  const { bills, tags, categories } = useBudget();
+  const { bills, tags, categories, transactions } = useBudget();
   const [editing, setEditing] = useState<string | "new" | null>(null);
 
   const rows = bills
     .map((bill) => {
       const tag = tags.find((t) => t.id === bill.tag_id);
       const category = categories.find((c) => c.id === tag?.category_id);
-      return { bill, tagName: tag?.name ?? "Unknown tag", categoryName: category?.name };
+      return {
+        bill,
+        tagName: tag?.name ?? "Unknown tag",
+        categoryName: category?.name,
+        plan: instalmentProgress(bill, transactions),
+      };
     })
     .sort((a, b) => a.tagName.localeCompare(b.tagName));
 
@@ -208,7 +273,7 @@ export function BillsManager({ showTitle = true }: { showTitle?: boolean }) {
         <p className="mt-4 text-sm text-muted-foreground">No bills yet.</p>
       ) : (
         <ul className="mt-3 divide-y divide-border/70">
-          {rows.map(({ bill, tagName, categoryName }) =>
+          {rows.map(({ bill, tagName, categoryName, plan }) =>
             editing === bill.id ? (
               <li key={bill.id} className="py-3">
                 <div className="mb-2 text-sm font-medium">{tagName}</div>
@@ -229,8 +294,17 @@ export function BillsManager({ showTitle = true }: { showTitle?: boolean }) {
                           <Repeat className="h-2.5 w-2.5" /> Auto
                         </span>
                       )}
+                      {plan && (
+                        <span className="flex shrink-0 items-center gap-0.5 rounded-full border px-1.5 py-px text-[10px] font-medium text-muted-foreground">
+                          <CalendarClock className="h-2.5 w-2.5" /> {plan.finished ? "Paid off" : "Plan"}
+                        </span>
+                      )}
                     </span>
-                    <span className="block text-xs text-muted-foreground">{categoryLabel(categoryName)}</span>
+                    <span className="block text-xs text-muted-foreground">
+                      {plan
+                        ? `${plan.paid} of ${plan.total} paid · last ${format(parseISO(`${plan.lastMonth}-01`), "MMM yyyy")}`
+                        : categoryLabel(categoryName)}
+                    </span>
                   </span>
                   <span className="shrink-0 text-right text-xs text-muted-foreground tabular-nums">
                     {bill.expected_amount ? formatCurrency(bill.expected_amount) : "Last month's amount"}
