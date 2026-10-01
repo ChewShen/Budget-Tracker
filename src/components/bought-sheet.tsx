@@ -9,6 +9,7 @@ import { planTerms } from "@/lib/instalments";
 import { cn, formatCurrency, ordinal } from "@/lib/utils";
 import type { InstalmentPurchase, NewTransaction } from "@/lib/budget-context";
 import type { Category, Goal, Tag } from "@/lib/types";
+import { useScrollLock } from "@/lib/use-scroll-lock";
 
 interface BoughtSheetProps {
   goal: Goal | null; // open when set
@@ -85,6 +86,8 @@ export function BoughtSheet({
     return () => window.removeEventListener("keydown", onKey);
   }, [goal, onClose]);
 
+  useScrollLock(Boolean(goal));
+
   if (!goal) return null;
 
   const price = toNumber(amount);
@@ -154,7 +157,7 @@ export function BoughtSheet({
         aria-modal="true"
         aria-label={`Bought ${goal.name}`}
         onClick={(e) => e.stopPropagation()}
-        className="max-h-sheet w-full max-w-md animate-sheet-up overflow-y-auto rounded-t-3xl border bg-card px-5 pb-safe pt-3 shadow-2xl sm:rounded-3xl sm:pb-5"
+        className="max-h-sheet w-full overscroll-contain max-w-md animate-sheet-up overflow-y-auto rounded-t-3xl border bg-card px-5 pb-safe pt-3 shadow-2xl sm:rounded-3xl sm:pb-5"
       >
         <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-border sm:hidden" />
         <div className="flex items-start justify-between">

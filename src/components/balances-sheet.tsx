@@ -6,6 +6,7 @@ import { Lock, Settings2, X } from "lucide-react";
 import type { DraftLine } from "@/lib/savings";
 import type { SavingsBalance } from "@/lib/types";
 import { formatCurrency } from "@/lib/utils";
+import { useScrollLock } from "@/lib/use-scroll-lock";
 
 interface BalancesSheetProps {
   isOpen: boolean;
@@ -59,6 +60,8 @@ export function BalancesSheet({ isOpen, monthLabel, lines, previousLabel, onClos
     return () => window.removeEventListener("keydown", onKey);
   });
 
+  useScrollLock(isOpen);
+
   if (!isOpen) return null;
 
   const set = (id: string, field: "balance" | "rate", text: string) => {
@@ -88,7 +91,7 @@ export function BalancesSheet({ isOpen, monthLabel, lines, previousLabel, onClos
         aria-modal="true"
         aria-label="Update balances"
         onClick={(e) => e.stopPropagation()}
-        className="max-h-sheet w-full max-w-md animate-sheet-up overflow-y-auto rounded-t-3xl border bg-card px-5 pb-safe pt-3 shadow-2xl sm:max-w-lg sm:rounded-3xl sm:pb-5"
+        className="max-h-sheet w-full overscroll-contain max-w-md animate-sheet-up overflow-y-auto rounded-t-3xl border bg-card px-5 pb-safe pt-3 shadow-2xl sm:max-w-lg sm:rounded-3xl sm:pb-5"
       >
         <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-border sm:hidden" />
 

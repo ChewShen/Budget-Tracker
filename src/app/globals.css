@@ -109,14 +109,18 @@
     -moz-appearance: textfield;
   }
 
-  /* iPhone Safari gives date inputs a built-in minimum width and ignores the column they're in,
-     so in a two-column row they spill into the next field. Let them shrink like other inputs. */
-  input[type="date"] {
+  /* iPhone Safari gives date, month and time inputs a built-in minimum width and ignores the
+     column they're in, so in a two-column row they spill into the next field. Let them shrink
+     like other inputs. */
+  input[type="date"],
+  input[type="month"],
+  input[type="time"],
+  input[type="datetime-local"] {
     min-width: 0;
     -webkit-appearance: none;
     appearance: none;
   }
-  input[type="date"]::-webkit-date-and-time-value {
+  input::-webkit-date-and-time-value {
     text-align: left;
   }
 }
