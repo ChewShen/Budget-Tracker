@@ -11,7 +11,10 @@ import { isPushConfigured, sendPush, type StoredSubscription } from "@/lib/push-
 export const dynamic = "force-dynamic";
 
 export async function POST() {
-  if (!isPushConfigured) return NextResponse.json({ error: "Notifications aren't set up on this deployment." }, { status: 500 });
+  if (!isPushConfigured) {
+    console.error("[reminders/test] Not sent: NEXT_PUBLIC_VAPID_PUBLIC_KEY or VAPID_PRIVATE_KEY isn't set.");
+    return NextResponse.json({ error: "Notifications aren't set up on this deployment." }, { status: 500 });
+  }
 
   const cookieStore = await cookies();
   const supabase = createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {

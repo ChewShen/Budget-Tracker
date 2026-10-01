@@ -83,7 +83,7 @@ The workflow does not build: Vercel already builds every push.
 * Every push builds on Vercel; the build also type-checks and lints, so a broken build never goes live.
 * Pushes to `main` deploy to production; other branches (`dev`, `chewshen`) get a preview URL.
 * Preview deployments use the **same Supabase project** as production, so test data entered there is real data.
-* Environment variables are set in Vercel → Settings → Environment Variables: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and for reminders `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `SUPABASE_SERVICE_ROLE_KEY` and `CRON_SECRET` (see README → Reminders). `NEXT_PUBLIC_` values are baked in at build time, so changing one needs a redeploy.
+* Environment variables are set in Vercel → Settings → Environment Variables: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and for reminders `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (the Supabase **secret** key, `sb_secret_…`) and `CRON_SECRET` (see README → Reminders). `NEXT_PUBLIC_` values are baked in at build time, so changing one needs a redeploy.
 * **Database migrations are run by hand** in the Supabase SQL Editor, in date order, before or right after the deploy that needs them. The app tolerates a missing migration (it says which file to run), so the order is forgiving.
 
 ---

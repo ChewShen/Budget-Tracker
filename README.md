@@ -264,6 +264,7 @@ Create `.env.local` in your root directory:
 NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-public-key
 ```
+Use the **publishable** key (`sb_publishable_…`) on newer Supabase projects, or the legacy **anon** key; both are public by design (RLS protects the data). Never put the **secret** key here.
 
 ### 4. Available Commands
 ```bash
@@ -285,12 +286,26 @@ Phone notifications are sent by a daily Vercel Cron job (`vercel.json`, 12:00 UT
    | --- | --- |
    | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | Public key from step 2 |
    | `VAPID_PRIVATE_KEY` | Private key from step 2 |
-   | `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Project Settings → API keys → `service_role` (server only, never `NEXT_PUBLIC_`) |
+   | `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Project Settings → API Keys → **Secret keys** → `default` (`sb_secret_…`). Older projects can use the legacy `service_role` key instead. Lets the nightly job read each account's data, so it's server only: never `NEXT_PUBLIC_`, never the publishable/anon key. |
    | `CRON_SECRET` | Any long random string, e.g. `openssl rand -hex 32`. Vercel sends it to the cron route; other callers get 401. |
+
+   Add them under the **project's** Settings (not team-wide), tick **Production**, and redeploy: deployments only pick up variables that existed when they were built.
 
 4. On each device: **Settings → Reminders → Turn on**, then **Send a test**. On iPhone/iPad (iOS 16.4+) this only works from the Home Screen app, not a Safari tab.
 
-To run the job by hand: `curl -H "Authorization: Bearer $CRON_SECRET" https://<your-app>/api/reminders`.
+**Check the nightly job:** Vercel → Settings → **Cron Jobs** → **Run**, then **Logs** filtered to `/api/reminders` (the free plan keeps logs for about an hour, so check right after). Each run logs a line starting with `[reminders]`:
+
+| Result | Meaning |
+| --- | --- |
+| 200 · `Done: {"users":1,"nothingDue":1,"sent":0,…}` | Working; nothing was due for that account tonight |
+| 200 · `Done: {…,"sent":2,…}` | Working; 2 reminders sent |
+| 401 · `CRON_SECRET isn't set` | Add `CRON_SECRET` for Production and redeploy |
+| 500 · `missing SUPABASE_SERVICE_ROLE_KEY` (or another name) | Add that variable and redeploy |
+| 500 · `couldn't read push_subscriptions: Invalid API key` | `SUPABASE_SERVICE_ROLE_KEY` isn't the secret / service_role key |
+
+"Send a test" only needs the VAPID keys, so it can work while the nightly job doesn't.
+
+To run the job by hand: `curl -H "Authorization: Bearer $CRON_SECRET" https://<your-app>/api/reminders` (sends anything due, once).
 
 ---
 

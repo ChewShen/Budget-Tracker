@@ -15,6 +15,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.17.1] - 2026-10-01
+
+### Fixed
+- **The nightly reminders job explains itself.** When it can't run, Vercel's logs now say why under `[reminders]` (e.g. `missing SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET isn't set`, or Supabase rejecting the key) instead of a bare 401/500. Successful runs log a summary, including accounts with nothing due. "Send a test" doesn't use that key, so it could work while the 8pm job failed.
+
+### Docs
+- New Supabase projects show a **publishable** and a **secret** key instead of anon and service_role: README, `.env.example` and the release flow say which goes where (`SUPABASE_SERVICE_ROLE_KEY` = the secret key).
+- README → Reminders: add variables at project level for Production and redeploy, plus how to check the nightly job (Cron Jobs → Run, and what each log line means).
+
+---
+
 ## [0.17.0] - 2026-10-01
 
 ### Added
