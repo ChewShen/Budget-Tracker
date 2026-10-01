@@ -371,7 +371,7 @@ export function QuickAddModal({
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
-                className="field"
+                className="field min-w-0"
                 aria-label="Date"
               />
               <button
