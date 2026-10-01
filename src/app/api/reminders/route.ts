@@ -1,7 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildReminders, DEFAULT_REMINDER_PREFS, type ReminderData, type ReminderPrefs } from "@/lib/reminders";
-import { createAdminClient, isPushConfigured, sendPush, todayInMalaysia, type StoredSubscription } from "@/lib/push-server";
+import {
+  createAdminClient,
+  missingServerEnv,
+  sendPush,
+  todayInMalaysia,
+  type StoredSubscription,
+} from "@/lib/push-server";
 
 // Daily reminder run, called by Vercel Cron (vercel.json, 12:00 UTC = 8pm Malaysia time).
 // For every account with a device subscribed: works out today's reminders with the same
@@ -53,20 +59,31 @@ async function loadData(db: SupabaseClient, userId: string, today: string): Prom
 
 export async function GET(request: NextRequest) {
   // Vercel Cron sends "Authorization: Bearer $CRON_SECRET". Without the secret set, refuse to run.
+  // Every early exit logs why (Vercel → Logs), so a failed night isn't a bare 401/500.
   const secret = process.env.CRON_SECRET;
-  if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`)
+  if (!secret) {
+    console.error("[reminders] Not run: CRON_SECRET isn't set for this deployment. Add it in Vercel and redeploy.");
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (request.headers.get("authorization") !== `Bearer ${secret}`) {
+    console.warn("[reminders] Refused: missing or wrong Authorization header (not Vercel Cron).");
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
+  const missing = missingServerEnv();
   const db = createAdminClient();
-  if (!db || !isPushConfigured)
-    return NextResponse.json(
-      { error: "Missing env: SUPABASE_SERVICE_ROLE_KEY, NEXT_PUBLIC_VAPID_PUBLIC_KEY or VAPID_PRIVATE_KEY" },
-      { status: 500 }
-    );
+  if (missing.length || !db) {
+    console.error(`[reminders] Not run: missing ${missing.join(", ")}. Add in Vercel and redeploy.`);
+    return NextResponse.json({ error: `Missing env: ${missing.join(", ")}` }, { status: 500 });
+  }
 
   const today = todayInMalaysia();
   const { data: subs, error } = await db.from("push_subscriptions").select("user_id, endpoint, p256dh, auth");
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    // e.g. "Invalid API key": SUPABASE_SERVICE_ROLE_KEY isn't the project's secret / service_role key.
+    console.error("[reminders] Not run: couldn't read push_subscriptions:", error.message);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 
   const byUser = new Map<string, StoredSubscription[]>();
   for (const s of subs as StoredSubscription[]) byUser.set(s.user_id, [...(byUser.get(s.user_id) || []), s]);
@@ -77,7 +94,8 @@ export async function GET(request: NextRequest) {
     .select("user_id, bills, vouchers, budgets, daily_log")
     .in("user_id", userIds.length ? userIds : ["00000000-0000-0000-0000-000000000000"]);
 
-  const summary = { date: today, users: userIds.length, sent: 0, skipped: 0, removedDevices: 0 };
+  // users = accounts with a device; nothingDue = of those, how many had no reminders today.
+  const summary = { date: today, users: userIds.length, nothingDue: 0, sent: 0, skipped: 0, removedDevices: 0 };
 
   for (const [userId, devices] of byUser) {
     const row = settings?.find((s) => s.user_id === userId);
@@ -88,7 +106,10 @@ export async function GET(request: NextRequest) {
     const data = await loadData(db, userId, today);
     if (!data) continue;
     const reminders = buildReminders(data, prefs);
-    if (!reminders.length) continue;
+    if (!reminders.length) {
+      summary.nothingDue++;
+      continue;
+    }
 
     const { data: logged } = await db
       .from("reminder_log")
@@ -123,5 +144,6 @@ export async function GET(request: NextRequest) {
   const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
   await db.from("reminder_log").delete().lt("sent_at", cutoff);
 
+  console.log("[reminders] Done:", JSON.stringify(summary));
   return NextResponse.json(summary);
 }
