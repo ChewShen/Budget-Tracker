@@ -125,6 +125,13 @@ Each entry covers what was chosen, why, and what it costs. For what changed and 
 - **What's owed is a debt:** Savings shows what's still owed and net worth after it, counted from when the plan was taken out, so past months aren't changed by a later purchase.
 - **Money in whole sen:** Plan terms are calculated in integer sen, because decimal ringgit in floating point can land just under a half sen and round the wrong way. The extra cost over paying upfront is the fees only, so a 0% plan never looks more expensive because of rounding.
 
+### Automation: Shortcuts → an Inbox, not straight into spending
+- **Why Shortcuts:** Bank linking isn't available to an individual app in Malaysia, but the payment already shows up on the phone. iOS Shortcuts can read the screen (TnG's success page), get Apple Pay purchases, or take a Siri command, and send them over HTTPS. A web app can't add its own Shortcut actions the way App Store apps do, so the Shortcut uses the standard "Get Contents of URL" with a personal token.
+- **The phone sends text; the app does the parsing:** Screenshots are read on the iPhone and only the text is sent. Parsing (`src/lib/ingest.ts`: amount, merchant, date, ignoring balance and cashback lines) lives in the app, so it can be improved without anyone rebuilding their Shortcut.
+- **An Inbox, not automatic entries:** Screen reading and parsing can be wrong, and a wrong amount quietly corrupts budgets and savings. Items wait to be confirmed (one tap when the suggestion is right). Merchant rules (`TEALIVE → Coffee`) are learned from what you confirm, matched as whole words on the merchant's first distinctive word, so other branches match too.
+- **Tokens can only add to your Inbox:** Only a SHA-256 hash is stored (the token is shown once), the endpoint looks it up with the service role and writes only for that token's owner, never returns data beyond what it just parsed, rejects bodies over 8,000 characters, and stops at 500 waiting items. Tokens are revoked rather than deleted, so "last used" stays visible.
+- **Order chosen:** TnG first (most common way to pay here), then bank alerts and statements, then Apple Pay. On iPhone, TnG needs the screen-reading route because iOS doesn't let apps read other apps' notifications.
+
 ### Budgets are one row per category
 - **Why:** A monthly limit per category (`UNIQUE (user_id, category_id)`) covers the common need without the complexity of per-month or rollover budgets. At-risk uses the same forecast rule as the Overview, so the two never disagree.
 

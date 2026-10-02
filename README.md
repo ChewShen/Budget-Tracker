@@ -44,6 +44,12 @@ Guest mode never touches the database and stores nothing in your browser, so **n
 - **Insights**: plain-English highlights such as tags above or below usual, no-spend days and weekend-heavy spending.
 - **Monthly trend**, **spending calendar** (days shaded by spend), **fixed vs flexible** split and **year to date**.
 
+### 🤖 Automation
+- **iPhone Shortcuts send expenses to an Inbox**: double-tap the back of the phone on a TnG (or any) payment screen and it's read on the phone and sent; Apple Pay purchases can be sent automatically; or say "Hey Siri, log expense".
+- **Inbox to confirm**: amount, merchant and date are filled in; check, pick or change the tag, and add. Nothing goes into your spending unconfirmed.
+- **Merchant rules**: confirming "Tealive → Coffee" means the next Tealive payment arrives already tagged.
+- **Personal tokens** (Settings → Automation): only a hash is stored, a token can only add Inbox items (never read data), and it can be revoked any time.
+
 ### 🧾 Monthly bills
 - Choose which tags are monthly bills, with an optional **expected amount** and **due day**.
 - Overview shows **Logged / Due in 2 days / Overdue / Missing**, and logs unpaid bills in one tap.
@@ -236,6 +242,7 @@ One-off SQL changes for existing databases live in [`scripts/migrations/`](scrip
 - `2026-09-30_roles.sql`: marks each account's food category and meal tags (breakfast, lunch, tea time, dinner, late night) so the Food & dining card and the time-of-day tag in Add expense keep working after renames; new accounts also get a Supper tag. Starred in Settings → Categories & tags.
 - `2026-09-30_savings_accounts.sql`: savings become per-person accounts (`savings_accounts`) with a month-end balance each (`savings_balances`) instead of the fixed Main checking / GXBank / RYT / EPF columns. Your history is copied over (same account names, net worth per month unchanged; the last query shows before/after); `monthly_savings` is kept as a backup.
 - `2026-10-01_instalments.sql`: instalment plans on monthly bills (number of payments, first payment month, linked goal, price and down payment), owner checks for the linked goal, and the daily auto-add job skipping plans outside their months.
+- `2026-10-03_inbox.sql`: `api_tokens` (hashed personal tokens), `inbox_items` (captured expenses to confirm) and `merchant_rules` (merchant → tag), owner-only, for Settings → Automation and the Inbox. The endpoint `/api/ingest` needs `SUPABASE_SERVICE_ROLE_KEY` (same as reminders).
 
 ### Adding a friend
 Sign-up stays off, so strangers can't create accounts. To give someone their own account:
