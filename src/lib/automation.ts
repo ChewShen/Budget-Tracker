@@ -7,6 +7,11 @@ import { merchantKey } from "./ingest";
 // Browser side of automation (cloud accounts only): personal tokens for /api/ingest, the Inbox
 // of captured expenses, and merchant rules learned when confirming.
 
+// The ready-made "Log Payment" Shortcut, shared from iCloud with an Import Question that asks for
+// the token when it's added. null until a shareable version exists; Settings → Automation then
+// shows only the build-it-yourself steps.
+export const SHORTCUT_URL: string | null = null;
+
 const MISSING_TABLE = ["42P01", "PGRST205"];
 export const AUTOMATION_MIGRATION_HINT = "Run scripts/migrations/2026-10-03_inbox.sql in Supabase first.";
 const describe = (error: { code?: string; message?: string }) =>
