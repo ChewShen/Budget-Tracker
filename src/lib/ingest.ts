@@ -127,6 +127,14 @@ export function parseDate(value: unknown, today: string): string | null {
 
 export const looksLikeTransfer = (text: string) => TRANSFER.test(text);
 
+// The reference numbers on a payment screen (DuitNow Ref No., Transaction No., Wallet Ref…), as one
+// string: long codes with plenty of digits, e.g. "20261003TNGDMYNB030OQRuh". Used to spot the same
+// receipt sent twice. Null when there are none (Apple Pay, Siri).
+export function referenceFromText(text: string): string | null {
+  const codes = (text.match(/[A-Za-z0-9]{10,}/g) || []).filter((t) => (t.match(/\d/g) || []).length >= 6);
+  return codes.length ? Array.from(new Set(codes)).sort().join(" ").slice(0, 200) : null;
+}
+
 export function parseCapture(
   input: { text?: unknown; amount?: unknown; merchant?: unknown; date?: unknown },
   today: string
