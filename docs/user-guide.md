@@ -190,6 +190,8 @@ After paying with TnG (or anything that shows a receipt), **double-tap the back 
 
 **2. Add the Log Payment Shortcut.** Tap **Add the Shortcut** in step 2 of that page. On your iPhone tap **Get Shortcut**, then **Set Up Shortcut**, and paste your token when it asks.
 
+> **Add Shortcut doesn't respond after pasting?** That's an iPhone bug. Tap **Skip Configuration** instead: the token you pasted is kept. To check, open **Log Payment** in the Shortcuts app; your token should be in the first box.
+
 <img src="../public/help/shortcut-get.png" alt="The Log Payment Shortcut, ready to add" width="240">
 
 *(If there's no Add the Shortcut button yet, open **Build it yourself** on the same page and follow the six steps; it takes about two minutes.)*
@@ -208,11 +210,16 @@ It works on the success screen right after you pay, and on receipts opened later
 
 ### Confirm in the Inbox
 
-Overview shows **"N expenses to confirm"**; tap it. Each item has the amount, shop, date and (once it knows the shop) a tag filled in. Check them, then **Add**, or **×** if it isn't an expense. **Add all ready** confirms every complete item at once.
+Overview shows **"N expenses to confirm"**; tap it. Each item has the amount, shop and date filled in, plus a category and tag:
+- a shop you've taught it (see below) gets **its own tag**;
+- otherwise it's set to **Food** and the **meal for the time you paid** (taken from the receipt, e.g. 9:32 am → Breakfast), like Add expense does, with a note saying it's a guess. Change it if it wasn't food;
+- transfers are left for you to choose.
+
+Check them, then **Add**, or **×** if it isn't an expense. **Add all ready** confirms every item whose tag came from a shop you've taught it, or that you picked yourself; time-of-day guesses get one tap each, so you see them first.
 
 <img src="../public/help/inbox.png" alt="An Inbox item: amount, date, category and tag filled in" width="320">
 
-- **It learns your shops.** Tick **"Next time, suggest this tag for …"** and that shop's payments arrive already tagged.
+- **It learns your shops when you ask it to.** The **"Next time, suggest this tag for …"** box starts unticked; tick it for shops you pay often, and their payments arrive already tagged.
 - **Transfers** (e.g. a DuitNow Transfer to your own bank) are labelled *Transfer*. Moving money between your own accounts isn't spending, so dismiss those.
 - **Already have it?** If an item matches an expense you already have that day, it says so, so you can dismiss it.
 - **original** shows exactly what was read from the screen, with a **Copy** button.
@@ -225,7 +232,8 @@ Overview shows **"N expenses to confirm"**; tap it. Each item has the amount, sh
 | … / **Added to Inbox: fill in the amount** | A receipt, but the amount couldn't be read (often hidden by the Back Tap banner). Fill it in in the Inbox |
 | **Not added: no amount found on this screen** | You double-tapped on something that isn't a receipt; nothing was added |
 | **Not added: already in your Inbox** / **already handled** | The same receipt was sent before |
-| **Not added: Invalid or revoked token…** | The token in your Shortcut is wrong or was revoked. Create a new one and set up the Shortcut again |
+| **Not added: This token (bt_…) was revoked** | The shortcut still has an old token. Paste your current one into its first box. If you have two copies of Log Payment, check Back Tap points at the right one |
+| **Not added: Token not recognised…** | The token is mistyped or cut short (it says how many characters it got; a token has 46). Copy it again from Settings → Automation |
 
 ### Apple Pay and Siri (optional)
 

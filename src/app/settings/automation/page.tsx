@@ -159,6 +159,11 @@ export default function AutomationSettingsPage() {
                   On your iPhone: tap <strong className="text-foreground">Get Shortcut</strong>, then{" "}
                   <strong className="text-foreground">Set Up Shortcut</strong>, and paste your token when it asks.
                 </p>
+                <p className="text-xs">
+                  If <strong className="text-foreground">Add Shortcut</strong> doesn&apos;t respond after pasting (an iPhone
+                  bug), tap <strong className="text-foreground">Skip Configuration</strong>: your token is kept. Check it&apos;s
+                  in the first box of Log Payment.
+                </p>
               </>
             ) : (
               <p>

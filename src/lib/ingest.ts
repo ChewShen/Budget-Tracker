@@ -135,6 +135,25 @@ export function referenceFromText(text: string): string | null {
   return codes.length ? Array.from(new Set(codes)).sort().join(" ").slice(0, 200) : null;
 }
 
+// The payment time on a receipt ("03/10/2026 09:32:00", "3 Oct 2026, 12:41 PM") as hours and
+// minutes, 24-hour. Only a time on the same line as a date counts: a lone "1:09" at the top of a
+// screenshot is the phone's clock, not when you paid.
+export function timeFromText(text: string): { hour: number; minute: number } | null {
+  const DATE = /\b\d{1,2}[/-]\d{1,2}[/-]\d{4}\b|\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4}\b/;
+  for (const line of text.split(/\r?\n/)) {
+    if (!DATE.test(line)) continue;
+    const m = line.match(/\b(\d{1,2}):(\d{2})(?::\d{2})?\s*([AaPp][Mm])?/);
+    if (!m) continue;
+    let hour = Number(m[1]);
+    const minute = Number(m[2]);
+    const ampm = m[3]?.toLowerCase();
+    if (ampm === "pm" && hour < 12) hour += 12;
+    if (ampm === "am" && hour === 12) hour = 0;
+    if (hour < 24 && minute < 60) return { hour, minute };
+  }
+  return null;
+}
+
 export function parseCapture(
   input: { text?: unknown; amount?: unknown; merchant?: unknown; date?: unknown },
   today: string

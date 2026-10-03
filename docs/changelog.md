@@ -15,6 +15,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.21.0] - 2026-10-03
+
+### Added
+- **Inbox defaults to Food and the meal for when you paid**, like Add expense: the time comes from the receipt ("03/10/2026 09:32:00" → Breakfast), never the phone's clock at the top of the screenshot. It's marked as a guess; shops with a rule get their own tag, and transfers are left for you to choose.
+
+### Changed
+- **"Suggest this tag next time" starts unticked** and no longer ticks itself when you change the tag: saving a rule for a shop is your choice.
+- **Add all ready** only takes items tagged by a rule or by you; time-of-day guesses get one tap each.
+
+### Fixed
+- Token errors say which problem it is: "This token (bt_AoQ7…) was revoked" or "Token not recognised (starts bt_…)", with its length when it isn't the 46 characters of a real token.
+- Settings → Automation, the guide and Help say what to do when **Add Shortcut** doesn't respond after pasting the token (an iPhone bug): tap **Skip Configuration**, the token is kept.
+
+---
+
 ## [0.20.0] - 2026-10-03
 
 ### Added
