@@ -119,6 +119,7 @@ const TOPICS: Topic[] = [
       "Settings → Automation → Create token (copy it now, it's shown once), then follow the Shortcut steps there.",
       "TnG: after paying, double-tap the back of your iPhone on the success screen. Apple Pay can be sent automatically.",
       "Everything lands in the Inbox to confirm. Tick \"suggest this tag next time\" and that merchant arrives tagged from then on.",
+      "Items labelled Transfer may be money moved to your own account. That isn't spending, so dismiss them.",
       "Lost your phone? Revoke the token.",
     ],
   },

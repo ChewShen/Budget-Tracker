@@ -181,6 +181,8 @@ Let your iPhone send payments to the app instead of typing them. Everything arri
 
 **3. Confirm in the Inbox.** Overview shows **"N expenses to confirm"**; tap it (or go to `/inbox`). Each item has the amount, merchant and date filled in where they could be read, and a tag if the merchant is known. Fix anything, then **Add**, or **×** to dismiss. **Add all ready** confirms every complete item. **original** shows exactly what was read.
 
+**Works on both TnG screens:** the success screen right after you pay, and a receipt opened later from your transaction history (it uses the receipt's own date and time). **Transfers** (e.g. DuitNow Transfer to a bank account) are labelled *Transfer*: moving money to your own account isn't spending, so dismiss those; money sent to someone for something you bought, add as usual.
+
 **It learns your merchants.** With **"Next time, suggest this tag for …"** ticked, confirming "GRAB → Grab" means the next Grab payment arrives already tagged, even from another branch.
 
 **Keep it safe.** A token can only add items to *your* Inbox; it can't read anything. If you lose your phone, **Revoke** the token in Settings → Automation.

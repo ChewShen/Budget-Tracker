@@ -20,14 +20,17 @@ const SOURCE_LABELS: Record<string, string> = {
 
 // Items keep the text that was read off the screen, so they're read again with the latest rules
 // here: an item captured before a parsing fix (e.g. a logo read as the merchant) fixes itself.
-function reread(item: InboxItem): InboxItem {
-  if (!item.raw_text) return item;
+type ReadItem = InboxItem & { isTransfer: boolean };
+
+function reread(item: InboxItem): ReadItem {
+  if (!item.raw_text) return { ...item, isTransfer: false };
   const fresh = parseCapture({ text: item.raw_text }, format(new Date(), "yyyy-MM-dd"));
   return {
     ...item,
     merchant: fresh.merchant, // same text, newer rules: trust it even when it finds none
     amount: item.amount ?? fresh.amount,
     occurred_on: fresh.date ?? item.occurred_on,
+    isTransfer: fresh.isTransfer,
   };
 }
 
@@ -48,7 +51,7 @@ function InboxRow({
   onConfirm,
   onDismiss,
 }: {
-  item: InboxItem;
+  item: ReadItem;
   draft: Draft;
   onChange: (d: Partial<Draft>) => void;
   onConfirm: () => void;
@@ -65,7 +68,14 @@ function InboxRow({
     <li className="card p-4 sm:p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="truncate text-sm font-semibold">{item.merchant || "Unknown merchant"}</div>
+          <div className="flex items-center gap-1.5">
+            <span className="truncate text-sm font-semibold">{item.merchant || "Unknown merchant"}</span>
+            {item.isTransfer && (
+              <span className="shrink-0 rounded-full border px-1.5 py-px text-[10px] font-medium text-muted-foreground">
+                Transfer
+              </span>
+            )}
+          </div>
           <div className="mt-0.5 text-xs text-muted-foreground">
             {SOURCE_LABELS[item.source] ?? item.source} · received {format(parseISO(item.created_at), "d MMM, h:mm a")}
             {item.raw_text && (
@@ -87,6 +97,12 @@ function InboxRow({
           <X className="h-4 w-4" />
         </button>
       </div>
+
+      {item.isTransfer && (
+        <p className="mt-2 text-xs text-muted-foreground">
+          A transfer: moving money to your own account isn&apos;t spending, so dismiss it if that&apos;s what it was.
+        </p>
+      )}
 
       {showRaw && item.raw_text && (
         <div className="mt-3 rounded-lg bg-secondary/60 p-3">
@@ -226,7 +242,7 @@ export default function InboxPage() {
   const update = (id: string, d: Partial<Draft>) =>
     setDrafts((prev) => ({ ...prev, [id]: { ...prev[id], ...d, ...(d.tagId && d.tagId !== prev[id]?.tagId ? { remember: true } : {}) } }));
 
-  const confirm = async (item: InboxItem, quiet = false) => {
+  const confirm = async (item: ReadItem, quiet = false) => {
     const d = drafts[item.id];
     const amount = parseFloat(d?.amount ?? "");
     if (!d || !(amount > 0) || !d.tagId) return false;
