@@ -95,7 +95,7 @@ The [**User Guide**](docs/user-guide.md) explains every feature step by step: ad
 - **Database & Authentication**: [Supabase (PostgreSQL)](https://supabase.com/) with Row-Level Security (RLS) and `pg_cron`
 - **PWA & notifications**: Web App Manifest, home-screen icons, a push-only service worker and Web Push (VAPID, [`web-push`](https://github.com/web-push-libs/web-push))
 - **Hosting & jobs**: [Vercel](https://vercel.com/) (free Hobby tier) with Vercel Cron for daily reminders
-- **Quality**: TypeScript, ESLint, formula parity tests, GitHub Actions CI
+- **Quality**: TypeScript, ESLint, Vitest (logic, receipt reading, the ingest endpoint, and every migration + RLS replayed on PGlite), GitHub Actions CI on every push and PR
 
 Why these tools and the main design choices: [`docs/decisions.md`](docs/decisions.md).
 
