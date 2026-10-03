@@ -120,6 +120,7 @@ const TOPICS: Topic[] = [
       "TnG: after paying, double-tap the back of your iPhone on the success screen. Apple Pay can be sent automatically.",
       "Everything lands in the Inbox to confirm. Tick \"suggest this tag next time\" and that merchant arrives tagged from then on.",
       "Items labelled Transfer may be money moved to your own account. That isn't spending, so dismiss them.",
+      "Double-tapped by accident? Screens without an amount and receipts already sent aren't added.",
       "Lost your phone? Revoke the token.",
     ],
   },

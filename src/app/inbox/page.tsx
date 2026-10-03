@@ -57,12 +57,15 @@ function InboxRow({
   onConfirm: () => void;
   onDismiss: () => void;
 }) {
-  const { categories, tags, showToast } = useBudget();
+  const { categories, tags, transactions, showToast } = useBudget();
   const [showRaw, setShowRaw] = useState(false);
   const categoryTags = tags.filter((t) => t.category_id === draft.categoryId);
   const amount = parseFloat(draft.amount);
   const canConfirm = amount > 0 && Boolean(draft.tagId) && Boolean(draft.date);
   const key = item.merchant ? merchantKey(item.merchant) : null;
+  // Already logged? (typed in by hand, or the same payment captured from another screen, which
+  // has different reference numbers so it couldn't be blocked automatically.)
+  const sameDay = amount > 0 ? transactions.find((t) => t.date === draft.date && Math.abs(t.amount - amount) < 0.005) : undefined;
 
   return (
     <li className="card p-4 sm:p-5">
@@ -70,7 +73,15 @@ function InboxRow({
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
             <span className="truncate text-sm font-semibold">{item.merchant || "Unknown merchant"}</span>
-            {item.isTransfer && (
+            {sameDay && (
+        <p className="mt-2 rounded-lg bg-warning/10 px-3 py-2 text-xs text-warning">
+          You already have {formatCurrency(sameDay.amount)} on {format(parseISO(sameDay.date), "d MMM")} (
+          {categoryLabel(sameDay.category_name ?? categories.find((c) => c.id === sameDay.category_id)?.name)} ·{" "}
+          {sameDay.tag_name ?? tags.find((t) => t.id === sameDay.tag_id)?.name}). Dismiss this if it&apos;s the same one.
+        </p>
+      )}
+
+      {item.isTransfer && (
               <span className="shrink-0 rounded-full border px-1.5 py-px text-[10px] font-medium text-muted-foreground">
                 Transfer
               </span>
