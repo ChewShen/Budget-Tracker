@@ -227,7 +227,8 @@ Overview shows **"N expenses to confirm"**; tap it. Each item has the amount, sh
 | … / **Added to Inbox: fill in the amount** | A receipt, but the amount couldn't be read (often hidden by the Back Tap banner). Fill it in in the Inbox |
 | **Not added: no amount found on this screen** | You double-tapped on something that isn't a receipt; nothing was added |
 | **Not added: already in your Inbox** / **already handled** | The same receipt was sent before |
-| **Not added: Invalid or revoked token…** | The token in your Shortcut is wrong or was revoked. Create a new one and set up the Shortcut again |
+| **Not added: This token (bt_…) was revoked** | The shortcut still has an old token. Paste your current one into its first box. If you have two copies of Log Payment, check Back Tap points at the right one |
+| **Not added: Token not recognised…** | The token is mistyped or cut short (it says how many characters it got; a token has 46). Copy it again from Settings → Automation |
 
 ### Apple Pay and Siri (optional)
 
