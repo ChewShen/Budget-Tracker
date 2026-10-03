@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, ChevronRight, Gauge, Landmark, Zap, Receipt, SlidersHorizontal, Tags, UserRound, Wallet, type LucideIcon } from "lucide-react";
+import { Bell, ChevronRight, CircleHelp, Gauge, Landmark, Zap, Receipt, SlidersHorizontal, Tags, UserRound, Wallet, type LucideIcon } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
 import { useBudget } from "@/lib/budget-context";
 
@@ -23,6 +23,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   { href: "/settings/automation", label: "Automation", icon: Zap },
   { href: "/settings/categories", label: "Categories & tags", icon: Tags },
   { href: "/settings/account", label: "Account", icon: UserRound },
+  { href: "/settings/help", label: "Help", icon: CircleHelp },
 ];
 
 // One-line summary under each section, so the list shows the current state at a glance.
@@ -50,6 +51,7 @@ function useSummaries(email: string | null): Record<string, string> {
     "/settings/automation": mode === "cloud" ? "Shortcuts, TnG, Apple Pay → Inbox" : "Needs an account",
     "/settings/reminders": mode === "cloud" ? "Bills, vouchers, budgets" : "Needs an account",
     "/settings/categories": `${plural(categories.length, "category", "categories")} · ${plural(tags.length, "tag")}`,
+    "/settings/help": "How things work, step by step",
     "/settings/account":
       mode === "guest" ? "Guest · nothing is saved" : mode === "local" ? "Saved on this device" : email || "Signed in",
   };
