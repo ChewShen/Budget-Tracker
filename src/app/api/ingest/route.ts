@@ -32,7 +32,11 @@ export async function POST(request: NextRequest) {
   // or just "Authorization: bt_…".
   const strip = (v: string | null) => v?.trim().replace(/^Bearer\s+/i, "") || "";
   const token = strip(request.headers.get("x-api-token")) || strip(request.headers.get("authorization"));
-  if (!token) return fail("Missing token. Check the Authorization header is Bearer <token>.", 401);
+  if (!token)
+    return fail(
+      "Missing token. Open the Log Payment shortcut and paste your token (Settings → Automation) into the first box.",
+      401
+    );
 
   const db = createAdminClient();
   if (!db) {

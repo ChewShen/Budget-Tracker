@@ -167,7 +167,7 @@ const TOPICS: Topic[] = [
       "Old version after an update: close the home-screen app completely and reopen it.",
       "No reminders: check Settings → Reminders shows On and Send a test arrives; on iPhone use the home-screen app.",
       "\"Run the latest migrations\": the app was updated but its database wasn't yet. Tell whoever runs it.",
-      "Shortcut says \"Missing token\" or \"Invalid or revoked token\": create a new token and add the Shortcut again (it asks for the token).",
+      "Shortcut says \"Missing token\" or \"Invalid or revoked token\": create a new token and paste it into the first box of the Log Payment shortcut (or add the Shortcut again; it asks).",
       "\"No amount found\" on a real receipt: turn Show Banner off in Back Tap; the banner can cover the amount.",
     ],
   },

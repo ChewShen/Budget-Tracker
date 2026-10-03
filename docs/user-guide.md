@@ -271,7 +271,7 @@ A token can only **add** items to *your* Inbox; it can't read anything. If you l
 
 **A message says "Run the latest migrations in Supabase first".** The app was updated but its database wasn't yet. Whoever runs the app needs to run the newest file in `scripts/migrations/`.
 
-**The Shortcut says "Missing token" or "Invalid or revoked token".** Create a new token in Settings → Automation. Then either add the Shortcut again (it asks for the token), or open it in the Shortcuts app and paste the token as the value of the `x-api-token` header in *Get Contents of URL* (left box `x-api-token`, right box the token).
+**The Shortcut says "Missing token" or "Invalid or revoked token".** Create a new token in Settings → Automation. Then open **Log Payment** in the Shortcuts app and paste it into the **first box** (the Text action at the top), replacing what's there. Or delete the shortcut and add it again with **Add the Shortcut**: it asks for the token. (If you built the shortcut yourself, the token goes in the `x-api-token` header of *Get Contents of URL*.)
 
 **"Not added: no amount found" on a real receipt.** Turn **Show Banner** off in Back Tap (iPhone Settings → Accessibility → Touch → Back Tap): the banner can cover the amount at the top. Make sure the amount is on screen when you double-tap.
 
