@@ -55,7 +55,7 @@ export default function AutomationSettingsPage() {
     const body = await res.json().catch(() => ({}));
     showToast(
       res.ok
-        ? { tone: "default", message: body.message || "Sent to Inbox" }
+        ? { tone: "default", message: (body.message || "Sent to Inbox").replace(/\n/g, " · ") }
         : { tone: "error", message: body.error || "Test failed" }
     );
   };
@@ -191,7 +191,7 @@ export default function AutomationSettingsPage() {
           </Step>
           <Step n={4}>
             Add <Code>Get Dictionary Value</Code> for <Code>message</Code>, then <Code>Show Notification</Code> with it,
-            so you see “RM 12.50 · Tealive → Coffee · added to Inbox”.
+            so you see “RM 12.50 · Tealive” with “Added to Inbox → Coffee” below it.
           </Step>
           <Step n={5}>
             iPhone <strong className="text-foreground">Settings → Accessibility → Touch → Back Tap → Double Tap</strong> →
