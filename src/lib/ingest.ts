@@ -9,6 +9,7 @@ export interface Captured {
   amount: number | null;
   merchant: string | null;
   date: string | null; // YYYY-MM-DD
+  isTransfer: boolean; // a money transfer (e.g. to your own account), which may not be spending
 }
 
 const MONEY = /(?:RM|MYR)\s*-?\s*(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d{1,2}))?/gi;
@@ -48,20 +49,59 @@ export function amountFromText(text: string): number | null {
   return (found.find((f) => f.paidLine) ?? found[0])?.amount ?? null;
 }
 
-// A whole-word label at the start of a line, then the name (or nothing: the name is on the next line).
-const MERCHANT_LABEL = /^\s*(?:paid to|pay to|payment to|merchant(?: name)?|payee|recipient|to|at)\b\s*[:\-]?\s*(.*)$/i;
+// A whole-word label at the start of a line, then the name (or nothing: the name is elsewhere).
+// "Recipient" counts only on its own or as "Recipient name": "Recipient Bank/ E-Wallet" is the bank.
+const MERCHANT_LABEL =
+  /^\s*(?:paid to|pay to|payment to|merchant(?: name)?|payee|receiver(?: name)?|recipient(?: name)?(?=\s*(?:[:\-]|$))|to|at)\b\s*[:\-]?\s*(.*)$/i;
+// TnG's "Payment Details" value: "Payment - MENG KEE CHAR SIEW RESTAURANT" (may wrap onto two lines).
+const PAYMENT_DASH = /^payment\s*[-–—:]\s*(.+)$/i;
+// Row labels on receipt screens. Screen reading often lists a column of labels and then their
+// values, so a line after "Merchant" can be another label rather than the name.
+// TnG history receipts (Merchant, Payment Details, Wallet Ref…) and success screens right after
+// paying or transferring (Receiver, Transfer to, Recipient Bank/ E-Wallet, DuitNow Ref No.…).
+const RECEIPT_LABEL =
+  /^(transaction type|merchant(?: name)?|payment details|payment method|date\s*(?:\/|&|and)\s*time|date|time|wallet ref|status|transaction no\.?|reference(?: no\.?)?|ref(?: no\.?)?|duitnow ref(?: no\.?)?|details|amount|total|recipient(?: name)?|receiver(?: name)?|payee|transfer to|transfer type|recipient bank\/?(?:\s*e-wallet)?|e-wallet|account number|account no\.?|remark|remarks|done|transferred|paid|payment successful)$/i;
+// Values on the same screens that are never the merchant.
+// (Long digit runs are reference numbers; a line of only digits and separators is a date or time.)
+const NOT_A_MERCHANT =
+  /duitnow|ewallet|e-wallet|balance|successful|pending|failed|points|transaction|reference|fund transfer|bank\/|^account$|tngd?$|\d{6,}|^[\d\s/:.-]+$/i;
+// Words that mark the screen as a transfer rather than a purchase.
+const TRANSFER = /\btransferred\b|duitnow transfer|fund transfer|transfer to\b/i;
 
-// The merchant in a block of text: the value after "Paid to / Merchant / To …", on the same line
-// or the next one.
+// Logo fragments and stray symbols read off the screen ("D", "_", "•").
+const isJunk = (line: string) => line.replace(/[^A-Za-z0-9]/g, "").length < 3;
+const isWrapContinuation = (line: string) =>
+  /^[A-Z0-9&'.,() -]+$/.test(line) && !RECEIPT_LABEL.test(line) && !NOT_A_MERCHANT.test(line) && !isJunk(line);
+
+// The merchant in a block of text read off a receipt or payment screen.
 export function merchantFromText(text: string): string | null {
   const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const usable = (l: string | undefined) =>
+    Boolean(l) && !isJunk(l as string) && !STARTS_WITH_MONEY.test(l as string) && !RECEIPT_LABEL.test(l as string) && !NOT_A_MERCHANT.test(l as string);
+
+  // 1. "Payment - NAME": the most reliable. If it wrapped, use the full name when it appears
+  //    on its own line (the Merchant row), else join the continuation line.
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(PAYMENT_DASH);
+    if (!m || isJunk(m[1])) continue;
+    const start = m[1].trim();
+    const full = lines.find((l, j) => j !== i && l.length > start.length && l.toUpperCase().startsWith(start.toUpperCase()));
+    if (full) return full.slice(0, 80);
+    const next = lines[i + 1];
+    return (next && isWrapContinuation(next) ? `${start} ${next}` : start).slice(0, 80);
+  }
+
+  // 2. "Merchant: NAME" on one line, or a label with the name on a later line (skipping other
+  //    labels, logo fragments and values like "DuitNow QR TNGD").
   for (let i = 0; i < lines.length; i++) {
     const m = lines[i].match(MERCHANT_LABEL);
     if (!m) continue;
     const value = m[1].trim();
-    // "Merchant" alone on a line, with the name on the next.
-    const candidate = value && !STARTS_WITH_MONEY.test(value) ? value : lines[i + 1];
-    if (candidate && !STARTS_WITH_MONEY.test(candidate)) return candidate.slice(0, 80);
+    if (value && usable(value)) return value.slice(0, 80);
+    if (value) continue; // e.g. "Total Amount" isn't a merchant label
+    // Labels may all come first (a column of labels, then a column of values), so look past them.
+    const found = lines.slice(i + 1).find(usable);
+    if (found) return found.slice(0, 80);
   }
   return null;
 }
@@ -85,6 +125,16 @@ export function parseDate(value: unknown, today: string): string | null {
   return out > today ? null : out;
 }
 
+export const looksLikeTransfer = (text: string) => TRANSFER.test(text);
+
+// The reference numbers on a payment screen (DuitNow Ref No., Transaction No., Wallet Ref…), as one
+// string: long codes with plenty of digits, e.g. "20261003TNGDMYNB030OQRuh". Used to spot the same
+// receipt sent twice. Null when there are none (Apple Pay, Siri).
+export function referenceFromText(text: string): string | null {
+  const codes = (text.match(/[A-Za-z0-9]{10,}/g) || []).filter((t) => (t.match(/\d/g) || []).length >= 6);
+  return codes.length ? Array.from(new Set(codes)).sort().join(" ").slice(0, 200) : null;
+}
+
 export function parseCapture(
   input: { text?: unknown; amount?: unknown; merchant?: unknown; date?: unknown },
   today: string
@@ -96,6 +146,7 @@ export function parseCapture(
     amount: parseAmount(input.amount) ?? (text ? amountFromText(text) : null),
     merchant,
     date: parseDate(input.date, today) ?? (text ? parseDate(text, today) : null),
+    isTransfer: looksLikeTransfer(text),
   };
 }
 

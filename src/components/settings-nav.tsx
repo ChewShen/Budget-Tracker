@@ -10,20 +10,24 @@ export interface SettingsSection {
   href: string;
   label: string;
   icon: LucideIcon;
+  group: SettingsGroup;
 }
 
-// Add new settings as a section here plus a page under src/app/settings/<name>/.
+type SettingsGroup = "Money" | "Tracking" | "Alerts & automation" | "Account";
+const GROUPS: SettingsGroup[] = ["Money", "Tracking", "Alerts & automation", "Account"];
+
+// Add new settings as a section here (in its group) plus a page under src/app/settings/<name>/.
 export const SETTINGS_SECTIONS: SettingsSection[] = [
-  { href: "/settings/general", label: "General", icon: SlidersHorizontal },
-  { href: "/settings/salary", label: "Salary & deductions", icon: Wallet },
-  { href: "/settings/savings", label: "Savings accounts", icon: Landmark },
-  { href: "/settings/budgets", label: "Budgets", icon: Gauge },
-  { href: "/settings/bills", label: "Monthly bills", icon: Receipt },
-  { href: "/settings/reminders", label: "Reminders", icon: Bell },
-  { href: "/settings/automation", label: "Automation", icon: Zap },
-  { href: "/settings/categories", label: "Categories & tags", icon: Tags },
-  { href: "/settings/account", label: "Account", icon: UserRound },
-  { href: "/settings/help", label: "Help", icon: CircleHelp },
+  { href: "/settings/salary", label: "Salary & deductions", icon: Wallet, group: "Money" },
+  { href: "/settings/savings", label: "Savings accounts", icon: Landmark, group: "Money" },
+  { href: "/settings/budgets", label: "Budgets", icon: Gauge, group: "Money" },
+  { href: "/settings/bills", label: "Monthly bills", icon: Receipt, group: "Money" },
+  { href: "/settings/categories", label: "Categories & tags", icon: Tags, group: "Tracking" },
+  { href: "/settings/general", label: "Preferences", icon: SlidersHorizontal, group: "Tracking" },
+  { href: "/settings/reminders", label: "Reminders", icon: Bell, group: "Alerts & automation" },
+  { href: "/settings/automation", label: "Automation", icon: Zap, group: "Alerts & automation" },
+  { href: "/settings/account", label: "Account", icon: UserRound, group: "Account" },
+  { href: "/settings/help", label: "Help", icon: CircleHelp, group: "Account" },
 ];
 
 // One-line summary under each section, so the list shows the current state at a glance.
@@ -57,39 +61,47 @@ function useSummaries(email: string | null): Record<string, string> {
   };
 }
 
-// Phone: full-width list with chevrons. Desktop: sidebar with the open section highlighted.
+// Grouped under small headings. Phone: a card per group with chevrons. Desktop: a sidebar with the
+// open section highlighted.
 export function SettingsNav({ email }: { email: string | null }) {
   const pathname = usePathname();
   const summaries = useSummaries(email);
 
   return (
-    <nav aria-label="Settings sections">
-      <ul className="card divide-y divide-border/70 overflow-hidden md:divide-y-0 md:border-0 md:bg-transparent md:p-0">
-        {SETTINGS_SECTIONS.map(({ href, label, icon: Icon }) => {
-          const isActive = pathname === href;
-          return (
-            <li key={href}>
-              <Link
-                href={href}
-                aria-current={isActive ? "page" : undefined}
-                className={cn(
-                  "flex items-center gap-3 px-4 py-3.5 transition hover:bg-secondary/40 md:rounded-xl md:px-3 md:py-2.5",
-                  isActive && "md:bg-secondary"
-                )}
-              >
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-secondary md:h-8 md:w-8 md:bg-transparent">
-                  <Icon className="h-4 w-4" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-medium">{label}</span>
-                  <span className="block truncate text-xs text-muted-foreground">{summaries[href]}</span>
-                </span>
-                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground md:hidden" />
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
+    <nav aria-label="Settings sections" className="space-y-5 md:space-y-4">
+      {GROUPS.map((group) => (
+        <div key={group}>
+          <h2 className="mb-1.5 px-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground md:px-3">
+            {group}
+          </h2>
+          <ul className="card divide-y divide-border/70 overflow-hidden md:divide-y-0 md:border-0 md:bg-transparent md:p-0">
+            {SETTINGS_SECTIONS.filter((s) => s.group === group).map(({ href, label, icon: Icon }) => {
+              const isActive = pathname === href;
+              return (
+                <li key={href}>
+                  <Link
+                    href={href}
+                    aria-current={isActive ? "page" : undefined}
+                    className={cn(
+                      "flex items-center gap-3 px-4 py-3.5 transition hover:bg-secondary/40 md:rounded-xl md:px-3 md:py-2.5",
+                      isActive && "md:bg-secondary"
+                    )}
+                  >
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-secondary md:h-8 md:w-8 md:bg-transparent">
+                      <Icon className="h-4 w-4" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-medium">{label}</span>
+                      <span className="block truncate text-xs text-muted-foreground">{summaries[href]}</span>
+                    </span>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground md:hidden" />
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ))}
     </nav>
   );
 }
