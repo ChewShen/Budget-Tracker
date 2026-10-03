@@ -21,7 +21,9 @@ When one is picked up, move it to `docs/changelog.md` under the version that shi
 
 - **Offline adding**: Service worker + queue so the installed app opens without signal and syncs expenses later.
 - **Duplicate warning**: Ask before saving the same tag, amount and date twice within a minute.
-- **Apple Pay auto-logging**: iPhone Shortcuts automation posting to an API endpoint (needs a secret key per user).
+- **Tune TnG parsing** with real TnG success screens and notifications (the Inbox's "original" text shows what was read).
+- **Bank alerts by email**: forward card/DuitNow alert emails to a private address that adds them to the Inbox.
+- **Manage merchant rules** in Settings (see, edit and delete what the Inbox has learned).
 - **Bank statement CSV import**: Match against logged expenses and suggest anything missing.
 - **Rename from the bill form**: A "Rename" field in Settings → Monthly bills that renames the underlying tag.
 

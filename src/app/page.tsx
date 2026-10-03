@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Inbox } from "lucide-react";
 import { ExportMenu } from "@/components/export-menu";
 import { addMonths, format, getDaysInMonth, parse, subMonths } from "date-fns";
 import { useBudget } from "@/lib/budget-context";
+import { useInbox } from "@/lib/automation";
 import { MonthSelector } from "@/components/month-selector";
 import { KpiCards } from "@/components/kpi-cards";
 import { SpendHero } from "@/components/spend-hero";
@@ -57,6 +58,8 @@ export default function DashboardPage() {
     showToast,
     mode,
   } = useBudget();
+  // Expenses sent by Shortcuts, waiting in the Inbox (signed-in accounts only).
+  const inbox = useInbox(mode === "cloud");
 
   // Filter transactions for currently selected month (YYYY-MM)
   const monthTransactions = transactions.filter((t) =>
@@ -324,6 +327,27 @@ export default function DashboardPage() {
           <ExportMenu />
         </div>
       </div>
+
+      {inbox.items.length > 0 && (
+        <Link
+          href="/inbox"
+          className="card flex items-center gap-3 border-primary/40 px-4 py-3 transition hover:bg-secondary/40"
+        >
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+            <Inbox className="h-4 w-4" />
+          </span>
+          <span className="min-w-0 flex-1 text-sm">
+            <span className="font-medium">
+              {inbox.items.length} expense{inbox.items.length === 1 ? "" : "s"} to confirm
+            </span>
+            <span className="block truncate text-xs text-muted-foreground">
+              From your Shortcuts: {inbox.items.slice(0, 3).map((i) => i.merchant || "unknown").join(", ")}
+              {inbox.items.length > 3 ? "…" : ""}
+            </span>
+          </span>
+          <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+        </Link>
+      )}
 
       <SpendHero
         monthLabel={monthLabel}
