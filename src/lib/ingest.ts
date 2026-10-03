@@ -48,20 +48,52 @@ export function amountFromText(text: string): number | null {
   return (found.find((f) => f.paidLine) ?? found[0])?.amount ?? null;
 }
 
-// A whole-word label at the start of a line, then the name (or nothing: the name is on the next line).
+// A whole-word label at the start of a line, then the name (or nothing: the name is elsewhere).
 const MERCHANT_LABEL = /^\s*(?:paid to|pay to|payment to|merchant(?: name)?|payee|recipient|to|at)\b\s*[:\-]?\s*(.*)$/i;
+// TnG's "Payment Details" value: "Payment - MENG KEE CHAR SIEW RESTAURANT" (may wrap onto two lines).
+const PAYMENT_DASH = /^payment\s*[-–—:]\s*(.+)$/i;
+// Row labels on receipt screens. Screen reading often lists a column of labels and then their
+// values, so a line after "Merchant" can be another label rather than the name.
+const RECEIPT_LABEL =
+  /^(transaction type|merchant(?: name)?|payment details|payment method|date\s*\/\s*time|date|time|wallet ref|status|transaction no\.?|reference(?: no\.?)?|ref(?: no\.?)?|details|amount|total|recipient|payee)$/i;
+// Values on the same screens that are never the merchant.
+// (Long digit runs are reference numbers; a line of only digits and separators is a date or time.)
+const NOT_A_MERCHANT =
+  /duitnow|ewallet|e-wallet|balance|successful|pending|failed|points|transaction|reference|tngd?$|\d{6,}|^[\d\s/:.-]+$/i;
 
-// The merchant in a block of text: the value after "Paid to / Merchant / To …", on the same line
-// or the next one.
+// Logo fragments and stray symbols read off the screen ("D", "_", "•").
+const isJunk = (line: string) => line.replace(/[^A-Za-z0-9]/g, "").length < 3;
+const isWrapContinuation = (line: string) =>
+  /^[A-Z0-9&'.,() -]+$/.test(line) && !RECEIPT_LABEL.test(line) && !NOT_A_MERCHANT.test(line) && !isJunk(line);
+
+// The merchant in a block of text read off a receipt or payment screen.
 export function merchantFromText(text: string): string | null {
   const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const usable = (l: string | undefined) =>
+    Boolean(l) && !isJunk(l as string) && !STARTS_WITH_MONEY.test(l as string) && !RECEIPT_LABEL.test(l as string) && !NOT_A_MERCHANT.test(l as string);
+
+  // 1. "Payment - NAME": the most reliable. If it wrapped, use the full name when it appears
+  //    on its own line (the Merchant row), else join the continuation line.
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(PAYMENT_DASH);
+    if (!m || isJunk(m[1])) continue;
+    const start = m[1].trim();
+    const full = lines.find((l, j) => j !== i && l.length > start.length && l.toUpperCase().startsWith(start.toUpperCase()));
+    if (full) return full.slice(0, 80);
+    const next = lines[i + 1];
+    return (next && isWrapContinuation(next) ? `${start} ${next}` : start).slice(0, 80);
+  }
+
+  // 2. "Merchant: NAME" on one line, or a label with the name on a later line (skipping other
+  //    labels, logo fragments and values like "DuitNow QR TNGD").
   for (let i = 0; i < lines.length; i++) {
     const m = lines[i].match(MERCHANT_LABEL);
     if (!m) continue;
     const value = m[1].trim();
-    // "Merchant" alone on a line, with the name on the next.
-    const candidate = value && !STARTS_WITH_MONEY.test(value) ? value : lines[i + 1];
-    if (candidate && !STARTS_WITH_MONEY.test(candidate)) return candidate.slice(0, 80);
+    if (value && usable(value)) return value.slice(0, 80);
+    if (value) continue; // e.g. "Total Amount" isn't a merchant label
+    const found = lines.slice(i + 1, i + 8).find(usable);
+    if (found) return found.slice(0, 80);
   }
   return null;
 }
