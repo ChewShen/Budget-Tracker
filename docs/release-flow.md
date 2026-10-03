@@ -49,17 +49,14 @@ Before opening a PR or tagging a release, execute this verification sequence:
 ```bash
 npm run type-check   # Strict TypeScript type safety (tsc --noEmit)
 npm run lint         # ESLint (flat config in eslint.config.mjs)
-npm test             # Formula parity with Excel (scripts/test_formulas.mjs)
+npm test             # All tests (Vitest, see "Tests" below)
 npm run build        # Next.js production build verification
 ```
 
 ### Checklist Criteria:
 - [x] **Type Safety**: `npm run type-check` passes with zero errors.
 - [x] **Linting**: `npm run lint` passes without warnings or errors.
-- [x] **Formula Integrity**:
-  - [x] Daily average spend correctly filters out `is_one_off = true`.
-  - [x] Salary deductions match exact Malaysian rates (`EPF = 11%`, `SOCSO = 17.25`, `EIS = 6.90`).
-  - [x] Interest calculation correctly compounds for month day count (`28-31`).
+- [x] **Tests**: `npm test` passes (logic and Excel formula parity, receipt reading, `/api/ingest`, database migrations and RLS).
 - [x] **Production Build**: `npm run build` completes successfully.
 - [x] **Mobile Responsiveness**:
   - [x] Mobile viewport verified (iPhone Safari & Android Chrome dimensions).
@@ -71,20 +68,30 @@ npm run build        # Next.js production build verification
 ## 4. Deployment Pipeline (CI/CD)
 
 ### Continuous Integration (GitHub Actions)
-[`.github/workflows/ci.yml`](../.github/workflows/ci.yml) runs on every pull request to `dev` or `main`, and on pushes to them:
+[`.github/workflows/ci.yml`](../.github/workflows/ci.yml) runs on every push to `chewshen`, `dev` and `main`, and on every pull request to `dev` or `main`:
 1. Clean install dependencies (`npm ci`, Node 22).
 2. TypeScript type-check.
 3. ESLint.
-4. Formula parity test against Excel (`npm test`); this is the one check Vercel does not run.
+4. Tests (`npm test`); Vercel never runs these.
+5. Production build, with placeholder Supabase values (no secrets in CI).
 
-The workflow does not build: Vercel already builds every push.
+A failing step shows a red ❌ on the commit and the PR. Don't merge until it's green.
+
+### Tests
+Vitest, in [`tests/`](../tests/), about a second for the lot:
+- `tests/logic.test.ts`: forecast, budgets, bills and auto-add, instalments (terms in whole sen, amount owed), reminders, the Add expense date, savings, goals, and the salary and interest formulas against the original Excel results.
+- `tests/ingest.test.ts`: reading TnG receipts, success screens and transfers (amount, payee, date, time, reference), and merchant rules. Example text uses made-up names and numbers only.
+- `tests/ingest-endpoint.test.ts`: `/api/ingest` with a stand-in database: token errors, duplicates, the Inbox cap and the notification text.
+- `tests/db/`: an in-memory Postgres ([PGlite](https://pglite.dev)) with stand-ins for Supabase's roles, `auth.users`, `auth.uid()` and pg_cron. It builds the database as a real one was built (the README's initial tables, an example spreadsheet import, `secure_rls.sql`, then every migration in the README's order), runs the migrations a second time, and then signs in as two accounts to check that neither can see, change or point at the other's data.
+
+New migration? Add it to the README's Migrations list; the database tests pick it up from there. New table? Add it to `OWNED_TABLES` in `tests/db/database.test.ts` so the privacy checks cover it.
 
 ### Continuous Deployment (Vercel)
 * Every push builds on Vercel; the build also type-checks and lints, so a broken build never goes live.
 * Pushes to `main` deploy to production; other branches (`dev`, `chewshen`) get a preview URL.
 * Preview deployments use the **same Supabase project** as production, so test data entered there is real data.
 * Environment variables are set in Vercel → Settings → Environment Variables: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and for reminders `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (the Supabase **secret** key, `sb_secret_…`) and `CRON_SECRET` (see README → Reminders). `NEXT_PUBLIC_` values are baked in at build time, so changing one needs a redeploy.
-* **Database migrations are run by hand** in the Supabase SQL Editor, in date order, before or right after the deploy that needs them. The app tolerates a missing migration (it says which file to run), so the order is forgiving.
+* **Database migrations are run by hand** in the Supabase SQL Editor, in the order the README lists them, before or right after the deploy that needs them. The app tolerates a missing migration (it says which file to run), so the order is forgiving.
 
 ---
 

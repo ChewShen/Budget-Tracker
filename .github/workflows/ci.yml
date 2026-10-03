@@ -1,12 +1,13 @@
 name: CI
 
-# Checks every PR into dev/main. Vercel already builds each push, so this runs the
-# fast checks plus the formula test that Vercel never runs.
+# Checks every push to the working branches and every PR into dev/main: types, lint, the tests
+# (money and date logic, receipt reading, the Shortcut endpoint, and the database: every
+# migration replayed, then each account checked to see only its own data) and a production build.
 on:
   pull_request:
     branches: [dev, main]
   push:
-    branches: [dev, main]
+    branches: [chewshen, dev, main]
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -32,5 +33,13 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Formula parity with Excel
+      - name: Tests
         run: npm test
+
+      # Placeholder values: the build only needs them to exist. No secrets in CI.
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
+          NEXT_TELEMETRY_DISABLED: 1
