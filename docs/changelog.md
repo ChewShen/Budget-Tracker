@@ -15,6 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.19.2] - 2026-10-03
+
+### Fixed
+- **Inbox on phones**: the "You already have RM 10.00 on 3 Oct…" warning sat beside the shop name and cut it short; it now sits below the item's header, and the name gets the full width.
+- **Shortcut notification**: two lines instead of one, with what was paid on top ("RM 10.00 · MENG KEE CHAR SIEW RESTAURANT") and the status below ("Added to Inbox → Lunch" / "Not added: already in your Inbox."), so long shop names aren't cut short.
+
+---
+
 ## [0.19.1] - 2026-10-03
 
 ### Added
