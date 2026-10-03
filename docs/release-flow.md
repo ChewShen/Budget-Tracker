@@ -80,7 +80,8 @@ A failing step shows a red ❌ on the commit and the PR. Don't merge until it's 
 ### Tests
 Vitest, in [`tests/`](../tests/), about a second for the lot:
 - `tests/logic.test.ts`: forecast, budgets, bills and auto-add, instalments (terms in whole sen, amount owed), reminders, the Add expense date, savings, goals, and the salary and interest formulas against the original Excel results.
-- `tests/ingest.test.ts`: reading TnG receipts, success screens and transfers (amount, payee, date, time, reference), and merchant rules. Example text uses made-up names and numbers only.
+- `tests/ingest.test.ts`: reading TnG receipts, success screens and transfers (amount, payee, date, time, reference), and merchant rule matching.
+- `tests/inbox.test.ts`: what an Inbox item starts as (a remembered shop's tag, Food with the meal by time, the time-of-day guess). Example text uses made-up names and numbers only.
 - `tests/ingest-endpoint.test.ts`: `/api/ingest` with a stand-in database: token errors, duplicates, the Inbox cap and the notification text.
 - `tests/db/`: an in-memory Postgres ([PGlite](https://pglite.dev)) with stand-ins for Supabase's roles, `auth.users`, `auth.uid()` and pg_cron. It builds the database as a real one was built (the README's initial tables, an example spreadsheet import, `secure_rls.sql`, then every migration in the README's order), runs the migrations a second time, and then signs in as two accounts to check that neither can see, change or point at the other's data.
 

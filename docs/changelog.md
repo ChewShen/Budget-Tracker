@@ -15,6 +15,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.23.0] - 2026-10-04
+
+### Added
+- **Shops it remembers**: in the Inbox, tick **Remember "SHOP" as** and choose:
+  - **Food (meal by time)**, the default for food: the shop is always Food and the meal follows when you paid (8am Breakfast, 9pm Dinner);
+  - a **category and tag**, e.g. Transport · Grab;
+  - **another category on its own**, e.g. Shopping, with the tag left to you.
+
+  Payments from that shop then arrive already sorted, with a line saying why, and count for **Add all ready**. The phone notification says what was picked ("→ Dinner").
+- **Settings → Automation → Shops it remembers**: see, change or forget remembered shops, or add one before you've paid there. Editing a rule updates Inbox items that are still waiting.
+
+### Changed
+- Remembering a shop can store a category without a tag (migration `2026-10-04_merchant_rule_categories.sql`; existing rules keep their tag). A rule's tag must be in its category.
+
+---
+
 ## [0.22.0] - 2026-10-03
 
 ### Added

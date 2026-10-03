@@ -5,10 +5,11 @@ import Link from "next/link";
 import { format, parseISO } from "date-fns";
 import { Check, ChevronLeft, Copy, Inbox, X } from "lucide-react";
 import { useBudget } from "@/lib/budget-context";
-import { useInbox, type InboxItem } from "@/lib/automation";
+import { useInbox, useMerchantRules, type InboxItem, type MerchantRule } from "@/lib/automation";
 import { categoryLabel } from "@/lib/categories";
-import { merchantKey, parseCapture, timeFromText } from "@/lib/ingest";
-import { foodCategory, MEAL_ROLES, mealForHour, mealTag } from "@/lib/roles";
+import { inboxDefault, type InboxDefault } from "@/lib/inbox";
+import { matchRule, merchantKey, parseCapture, timeFromText } from "@/lib/ingest";
+import { foodCategory } from "@/lib/roles";
 import { cn, formatCurrency } from "@/lib/utils";
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -41,25 +42,28 @@ interface Draft {
   date: string;
   categoryId: string;
   tagId: string;
+  // How the category and tag were chosen (see lib/inbox.ts), and why, e.g. "guessed from the
+  // payment time (9:32 am, breakfast)". Picking a category or tag yourself makes it "you".
+  from: InboxDefault["from"] | "you";
+  note: string | null;
   remember: boolean;
-  // Set when the tag is the time-of-day meal guess rather than a merchant rule or your choice;
-  // e.g. "guessed from the payment time (9:32 am)". Cleared once you pick a tag yourself.
-  guess: string | null;
+  rememberAs: "category" | "tag"; // the category alone (meal by time for Food), or category + tag
 }
-
-const clock = (hour: number, minute: number) =>
-  format(new Date(2000, 0, 1, hour, minute), minute ? "h:mm a" : "h a").toLowerCase();
 
 const isMoney = (t: string) => /^\d*\.?\d{0,2}$/.test(t);
 
 function InboxRow({
   item,
+  rule,
+  categoryOnly,
   draft,
   onChange,
   onConfirm,
   onDismiss,
 }: {
   item: ReadItem;
+  rule: MerchantRule | null;
+  categoryOnly: boolean; // rules can remember a category alone (after the 2026-10-04 migration)
   draft: Draft;
   onChange: (d: Partial<Draft>) => void;
   onConfirm: () => void;
@@ -70,7 +74,14 @@ function InboxRow({
   const categoryTags = tags.filter((t) => t.category_id === draft.categoryId);
   const amount = parseFloat(draft.amount);
   const canConfirm = amount > 0 && Boolean(draft.tagId) && Boolean(draft.date);
-  const key = item.merchant ? merchantKey(item.merchant) : null;
+  const key = rule?.pattern ?? (item.merchant ? merchantKey(item.merchant) : null);
+  const category = categories.find((c) => c.id === draft.categoryId);
+  const tag = tags.find((t) => t.id === draft.tagId);
+  const isFood = Boolean(category) && foodCategory(categories)?.id === category?.id;
+  const anyTag = isFood ? "meal by time" : "any tag";
+  // Already remembered exactly like this? Then there's nothing to tick.
+  const ruleMatches =
+    rule && rule.category_id === draft.categoryId && (rule.tag_id ? rule.tag_id === draft.tagId : draft.from === "rule-meal" || !draft.tagId);
   // Already logged? (typed in by hand, or the same payment captured from another screen, which
   // has different reference numbers so it couldn't be blocked automatically.)
   const sameDay = amount > 0 ? transactions.find((t) => t.date === draft.date && Math.abs(t.amount - amount) < 0.005) : undefined;
@@ -109,10 +120,17 @@ function InboxRow({
         </button>
       </div>
 
-      {draft.guess && draft.tagId && (
+      {draft.from === "guess" && tag && (
         <p className="mt-2 text-xs text-muted-foreground">
-          {categoryLabel(categories.find((c) => c.id === draft.categoryId)?.name)} ·{" "}
-          {tags.find((t) => t.id === draft.tagId)?.name}: {draft.guess}. Change it if it wasn&apos;t food.
+          {categoryLabel(category?.name)} · {tag.name}: {draft.note}. Change it if it wasn&apos;t food.
+        </p>
+      )}
+      {(draft.from === "rule" || draft.from === "rule-meal") && rule && category && (
+        <p className="mt-2 text-xs text-muted-foreground">
+          Remembered: “{rule.pattern}” is {categoryLabel(category.name)}
+          {rule.tag_id && tag ? ` · ${tag.name}` : ""}.
+          {draft.from === "rule-meal" && tag && ` ${tag.name}: ${draft.note}.`}
+          {!draft.tagId && " Pick a tag."}
         </p>
       )}
 
@@ -212,16 +230,40 @@ function InboxRow({
       </div>
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-        {key ? (
-          <label className="flex items-center gap-2 text-xs text-muted-foreground">
-            <input
-              type="checkbox"
-              checked={draft.remember}
-              onChange={(e) => onChange({ remember: e.target.checked })}
-              className="h-4 w-4 accent-[hsl(var(--primary))]"
-            />
-            Next time, suggest this tag for “{key}”
-          </label>
+        {key && category && !ruleMatches && (tag || categoryOnly) ? (
+          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={draft.remember}
+                // Food shops default to the category alone, so the meal keeps following the time.
+                onChange={(e) =>
+                  onChange({ remember: e.target.checked, rememberAs: categoryOnly && (isFood || !tag) ? "category" : "tag" })
+                }
+                className="h-4 w-4 accent-[hsl(var(--primary))]"
+              />
+              {rule ? "Update" : "Remember"} “{key}” as
+            </label>
+            {draft.remember && (
+              <select
+                value={draft.rememberAs}
+                onChange={(e) => onChange({ rememberAs: e.target.value as Draft["rememberAs"] })}
+                className="field w-auto py-1 text-xs"
+                aria-label="Remember as"
+              >
+                {categoryOnly && (
+                  <option value="category">
+                    {categoryLabel(category.name)} ({anyTag})
+                  </option>
+                )}
+                {tag && (
+                  <option value="tag">
+                    {categoryLabel(category.name)} · {tag.name}
+                  </option>
+                )}
+              </select>
+            )}
+          </div>
         ) : (
           <span />
         )}
@@ -242,60 +284,61 @@ export default function InboxPage() {
   const { mode, tags, categories, addTransaction, showToast } = useBudget();
   const isCloud = mode === "cloud";
   const { items: stored, isLoaded, error, resolve } = useInbox(isCloud);
+  const merchantRules = useMerchantRules(isCloud, tags);
+  const { rules } = merchantRules;
   const items = useMemo(() => stored.map(reread), [stored]);
+  const ruleFor = (i: ReadItem) => matchRule(i.merchant, rules);
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
 
-  // A draft per item, prefilled from what was captured and the suggested tag.
+  // A draft per item, prefilled from what was captured and the shop's rule (once rules are loaded).
   useEffect(() => {
+    if (!merchantRules.isLoaded) return;
     setDrafts((prev) => {
       if (items.every((i) => prev[i.id])) return prev; // nothing new
       const next = { ...prev };
       for (const i of items) {
         if (next[i.id]) continue;
-        // 1. A merchant rule's tag. 2. Otherwise (not a transfer) Food and the meal for the time it
-        //    was paid, like Add expense does, marked as a guess. 3. Otherwise left for you to pick.
-        const ruleTag = tags.find((t) => t.id === i.suggested_tag_id);
-        let tag = ruleTag;
-        let guess: string | null = null;
-        if (!tag && !i.isTransfer) {
-          const when = i.paidAt ?? { hour: parseISO(i.created_at).getHours(), minute: parseISO(i.created_at).getMinutes() };
-          const meal = mealForHour(when.hour);
-          tag = mealTag(categories, tags, meal) ?? undefined;
-          if (!tag) {
-            const food = foodCategory(categories);
-            tag = food ? tags.find((t) => t.category_id === food.id) : undefined;
-          }
-          if (tag)
-            guess = `guessed from the ${i.paidAt ? "payment" : "sending"} time (${clock(when.hour, when.minute)}, ${
-              MEAL_ROLES.find((m) => m.role === meal)?.label.split(" (")[0]
-            })`;
-        }
+        const sent = parseISO(i.created_at);
+        const pick = inboxDefault({
+          rule: matchRule(i.merchant, rules),
+          storedTagId: i.suggested_tag_id,
+          storedCategoryId: i.suggested_category_id,
+          isTransfer: i.isTransfer,
+          when: i.paidAt ?? { hour: sent.getHours(), minute: sent.getMinutes() },
+          timeOf: i.paidAt ? "payment" : "sending",
+          categories,
+          tags,
+        });
         next[i.id] = {
           amount: i.amount ? String(i.amount) : "",
           date: i.occurred_on ?? format(new Date(), "yyyy-MM-dd"),
-          categoryId: tag?.category_id ?? i.suggested_category_id ?? "",
-          tagId: tag?.id ?? "",
+          categoryId: pick.categoryId,
+          tagId: pick.tagId,
+          from: pick.from,
+          note: pick.note,
           remember: false, // saving a rule is your choice
-          guess,
+          rememberAs: "category",
         };
       }
       return next;
     });
-  }, [items, tags, categories]);
+  }, [items, tags, categories, rules, merchantRules.isLoaded]);
 
-  // Picking a category or tag yourself turns a guess into your choice.
+  // Picking a category or tag yourself turns a guess (or a rule's pick) into your choice.
   const update = (id: string, d: Partial<Draft>) =>
     setDrafts((prev) => ({
       ...prev,
-      [id]: { ...prev[id], ...d, ...(d.tagId !== undefined || d.categoryId !== undefined ? { guess: null } : {}) },
+      [id]: { ...prev[id], ...d, ...(d.tagId !== undefined || d.categoryId !== undefined ? { from: "you" as const, note: null } : {}) },
     }));
 
   const confirm = async (item: ReadItem, quiet = false) => {
     const d = drafts[item.id];
     const amount = parseFloat(d?.amount ?? "");
     if (!d || !(amount > 0) || !d.tagId) return false;
-    const ok = await resolve(item, "accepted", d.remember ? { tagId: d.tagId } : undefined);
+    const ok = await resolve(item, "accepted");
     if (!ok) return false;
+    const key = ruleFor(item)?.pattern ?? (item.merchant ? merchantKey(item.merchant) : null);
+    if (d.remember && key) await merchantRules.save(key, d.categoryId, d.rememberAs === "tag" && d.tagId ? d.tagId : null);
     await addTransaction({
       amount: Math.round(amount * 100) / 100,
       date: d.date,
@@ -308,11 +351,11 @@ export default function InboxPage() {
     return true;
   };
 
-  // "Add all" only takes items whose tag came from a merchant rule or from you: time-of-day guesses
-  // get one tap each, after you've seen them.
+  // "Add all" only takes items whose tag came from a remembered shop or from you: time-of-day
+  // guesses for shops it doesn't know get one tap each, after you've seen them.
   const ready = items.filter((i) => {
     const d = drafts[i.id];
-    return d && parseFloat(d.amount) > 0 && d.tagId && d.date && !d.guess;
+    return d && parseFloat(d.amount) > 0 && d.tagId && d.date && d.from !== "guess";
   });
 
   const confirmAll = async () => {
@@ -351,6 +394,8 @@ export default function InboxPage() {
         </div>
       </div>
 
+      {merchantRules.error && <p className="rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">{merchantRules.error}</p>}
+
       {!isCloud ? (
         <section className="card p-5 text-sm text-muted-foreground">
           The Inbox is filled by Shortcuts sending to your account, so it needs you to be signed in.
@@ -376,6 +421,8 @@ export default function InboxPage() {
               <InboxRow
                 key={item.id}
                 item={item}
+                rule={ruleFor(item)}
+                categoryOnly={!merchantRules.needsMigration}
                 draft={drafts[item.id]}
                 onChange={(d) => update(item.id, d)}
                 onConfirm={() => confirm(item)}
