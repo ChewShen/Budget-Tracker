@@ -11,7 +11,7 @@
 ## 🧪 Verification & Testing Results
 - [ ] `npm run type-check` passed
 - [ ] `npm run lint` passed
-- [ ] `npm test` (formula parity) passed
+- [ ] `npm test` passed (CI runs it too)
 - [ ] `npm run build` completed successfully
 
 ---

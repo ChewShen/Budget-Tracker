@@ -15,6 +15,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.22.0] - 2026-10-03
+
+### Added
+- **Automated tests**, run by `npm test` (Vitest, 100 tests, about a second) and by GitHub Actions on every push to `chewshen`, `dev` and `main` and on every PR, next to type-check, lint and a production build. Placeholder values only: no secrets in CI.
+  - **Database and privacy**: an in-memory Postgres (PGlite) is built the way the real one was (the README's tables, an example import, `secure_rls.sql`, every migration, then every migration again), then two accounts are checked: neither can see, change, delete or point at the other's data in any of the 16 tables, signed-out visitors see nothing, and the nightly auto-add only charges instalments in their months.
+  - **Receipt reading**: TnG receipts, success screens and transfers (made-up names), hidden amounts, dates, payment times, references and merchant rules.
+  - **The Shortcut's endpoint** (`/api/ingest`): token errors, duplicate receipts, the 500-item Inbox limit and the notification text.
+  - **Money and dates**: forecast, budgets, bills, instalment terms and amount owed, reminders, the Add expense date, savings, goals, and the salary and interest results from the original spreadsheet.
+
+### Changed
+- `npm test` now runs the test suite. The old formula script is gone: it checked copies of the formulas, not the app's own code.
+- The README's Migrations list is the order to run them in (three files from 28 Sep depend on each other); the tests replay it and fail if a migration file isn't listed.
+
+### Fixed
+- **Receipt dates**: a shop name that looks like a date ("99 SPEEDMART 1234") no longer hides the receipt's real date, which made older receipts land on today. Found by the new tests.
+
+---
+
 ## [0.21.0] - 2026-10-03
 
 ### Added
@@ -25,7 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Add all ready** only takes items tagged by a rule or by you; time-of-day guesses get one tap each.
 
 ### Fixed
-- Token errors say which problem it is: "This token (bt_AoQ7…) was revoked" or "Token not recognised (starts bt_…)", with its length when it isn't the 46 characters of a real token.
+- Token errors say which problem it is: "This token (bt_xxxx…) was revoked" or "Token not recognised (starts bt_…)", with its length when it isn't the 46 characters of a real token.
 - Settings → Automation, the guide and Help say what to do when **Add Shortcut** doesn't respond after pasting the token (an iPhone bug): tap **Skip Configuration**, the token is kept.
 
 ---

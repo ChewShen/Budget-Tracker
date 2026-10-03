@@ -115,10 +115,11 @@ export function parseDate(value: unknown, today: string): string | null {
   const candidates: Date[] = [];
   const iso = s.match(/\d{4}-\d{2}-\d{2}/);
   if (iso) candidates.push(parseISO(iso[0]));
-  const dmy = s.match(/\b\d{1,2}[/-]\d{1,2}[/-]\d{4}\b/);
-  if (dmy) candidates.push(...DATE_FORMATS.slice(0, 3).map((f) => parse(dmy[0], f, new Date())));
-  const named = s.match(/\b\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4}\b|\b[A-Za-z]{3,9}\s+\d{1,2},\s*\d{4}\b/);
-  if (named) candidates.push(...DATE_FORMATS.slice(3).map((f) => parse(named[0], f, new Date())));
+  // Every match, not just the first: a shop name like "99 SPEEDMART 1234" looks like a date too.
+  for (const dmy of s.matchAll(/\b\d{1,2}[/-]\d{1,2}[/-]\d{4}\b/g))
+    candidates.push(...DATE_FORMATS.slice(0, 3).map((f) => parse(dmy[0], f, new Date())));
+  for (const named of s.matchAll(/\b\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4}\b|\b[A-Za-z]{3,9}\s+\d{1,2},\s*\d{4}\b/g))
+    candidates.push(...DATE_FORMATS.slice(3).map((f) => parse(named[0], f, new Date())));
   const ok = candidates.find((d) => isValid(d) && d.getFullYear() > 2000);
   if (!ok) return null;
   const out = format(ok, "yyyy-MM-dd");
