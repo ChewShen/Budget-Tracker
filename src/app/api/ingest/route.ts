@@ -23,13 +23,20 @@ const fail = (error: string, status: number) => NextResponse.json({ ok: false, e
 const skip = (reason: string, what?: string) =>
   NextResponse.json({ ok: false, skipped: true, message: [what, `Not added: ${reason}`].filter(Boolean).join("\n") });
 // "RM 10.00 · MENG KEE CHAR SIEW RESTAURANT": the first line of the Shortcut's notification.
-const describe = (amount: number, merchant: string | null) => [formatCurrency(amount), merchant].filter(Boolean).join(" · ");
+const describe = (amount: number | null, merchant: string | null) =>
+  [amount ? formatCurrency(amount) : "Amount not found", merchant].filter(Boolean).join(" · ");
 const REPEAT_WINDOW_MS = 10 * 60 * 1000; // same amount, merchant and date sent again within 10 minutes
 
 export async function POST(request: NextRequest) {
-  const header = request.headers.get("authorization") || "";
-  const token = header.startsWith("Bearer ") ? header.slice(7).trim() : request.headers.get("x-api-token")?.trim();
-  if (!token) return fail("Missing token. Check the Authorization header is Bearer <token>.", 401);
+  // The token can come as "x-api-token: bt_…" (easiest in a shared Shortcut), "Authorization: Bearer bt_…",
+  // or just "Authorization: bt_…".
+  const strip = (v: string | null) => v?.trim().replace(/^Bearer\s+/i, "") || "";
+  const token = strip(request.headers.get("x-api-token")) || strip(request.headers.get("authorization"));
+  if (!token)
+    return fail(
+      "Missing token. Open the Log Payment shortcut and paste your token (Settings → Automation) into the first box.",
+      401
+    );
 
   const db = createAdminClient();
   if (!db) {
@@ -72,10 +79,12 @@ export async function POST(request: NextRequest) {
   const occurredOn = captured.date ?? today;
   const rawText = typeof input.text === "string" ? input.text : "";
 
-  // Accidental double-taps. No amount: not a payment screen (or a zero amount), so nothing to add.
-  if (!captured.amount) return skip("no amount found on this screen.");
   // The same receipt again: its reference numbers were seen before (even if already confirmed).
   const reference = rawText ? referenceFromText(rawText) : null;
+  // Accidental double-taps: no amount and nothing that looks like a receipt (no payee, no reference)
+  // means it wasn't a payment screen. A receipt whose amount was hidden (e.g. under a banner) is still
+  // added, with the amount left for you to fill in.
+  if (!captured.amount && !reference && !captured.merchant) return skip("no amount found on this screen.");
   if (reference) {
     const { data: same, error: refError } = await db
       .from("inbox_items")
@@ -92,7 +101,7 @@ export async function POST(request: NextRequest) {
   }
   // No reference (Apple Pay, Siri): the same amount, merchant and date a moment ago is a repeat.
   // (With references, a new one means a new payment, e.g. two RM 10 meals at the same stall.)
-  if (!reference) {
+  if (!reference && captured.amount) {
     const { data: recent } = await db
       .from("inbox_items")
       .select("merchant")
@@ -132,7 +141,11 @@ export async function POST(request: NextRequest) {
   await db.from("api_tokens").update({ last_used_at: new Date().toISOString() }).eq("id", tok.id);
 
   // The Shortcut's notification: what was paid on the first line, what happened below it.
-  const status = ["Added to Inbox", tag ? `→ ${tag.name}` : null, captured.isTransfer ? "(transfer)" : null]
+  const status = [
+    captured.amount ? "Added to Inbox" : "Added to Inbox: fill in the amount",
+    tag ? `→ ${tag.name}` : null,
+    captured.isTransfer ? "(transfer)" : null,
+  ]
     .filter(Boolean)
     .join(" ");
   return NextResponse.json({

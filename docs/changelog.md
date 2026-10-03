@@ -15,6 +15,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.20.0] - 2026-10-03
+
+### Added
+- **Add the Shortcut**: Settings → Automation links to a ready-made **Log Payment** Shortcut. Tap Get Shortcut → Set Up Shortcut and paste your token; no building it by hand.
+- **Settings → Automation as 3 steps**: create your token, add the Shortcut, turn on Back Tap (with Show Banner off). Then "Try it", your tokens, and a fold-out **Build it yourself** section.
+- **Clearer user guide**: a Quick start at the top, the automation section rewritten around the 3 steps with screenshots, and a table of what each notification means. **Help** gains a Quick start topic and the same screenshots.
+
+### Fixed
+- A receipt whose amount was hidden (e.g. under the Back Tap banner) is now added to the Inbox with the amount to fill in, instead of "no amount found". "Transfer To" is read as the payee on TnG transfer receipts.
+- The token is accepted as an `x-api-token` header, or in `Authorization` with or without "Bearer". A missing token says where to paste it.
+
+---
+
 ## [0.19.2] - 2026-10-03
 
 ### Fixed
