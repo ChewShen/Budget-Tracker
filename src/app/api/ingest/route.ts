@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
 
   // One line a Shortcut can show as a notification.
   const where = [captured.merchant, tag ? `→ ${tag.name}` : null].filter(Boolean).join(" ");
-  const message = [captured.amount ? formatCurrency(captured.amount) : "Amount not found", where]
+  const message = [captured.amount ? formatCurrency(captured.amount) : "Amount not found", where, captured.isTransfer ? "transfer" : null]
     .filter(Boolean)
     .join(" · ");
   return NextResponse.json({
