@@ -236,7 +236,7 @@ The seed script opens the tables so data can be loaded. Close them afterwards:
 This assigns all data to your user and replaces every policy with owner-only RLS. Then run the migrations below; `2026-09-30_multi_user.sql` makes categories and tags per account too. The app then requires sign-in (`/login`). **Do not re-run `seed_data.sql` afterwards**; it re-opens the tables.
 
 ### 4. Migrations
-One-off SQL changes for existing databases live in [`scripts/migrations/`](scripts/migrations/). Run each new file once in the SQL Editor, in date order:
+One-off SQL changes for existing databases live in [`scripts/migrations/`](scripts/migrations/). Run each new file once in the SQL Editor, in the order listed here (files from the same day depend on each other). The tests replay this list in this order, and fail if a file in the folder is missing from it:
 - `2026-09-28_manage_categories_tags.sql`: adds `categories.icon` and lets the owner add, rename and delete categories and tags.
 - `2026-09-28_monthly_bills.sql`: adds expected amount and due day to `recurring_sentinel`, one row per bill, and carries over the 8 bills the app used to hard-code.
 - `2026-09-28_auto_bills.sql`: per-bill "Add automatically" switch and a daily `pg_cron` job (00:05 Malaysia time) that adds due auto bills. Needs the `pg_cron` extension (Dashboard → Database → Extensions).
@@ -288,7 +288,8 @@ Use the **publishable** key (`sb_publishable_…`) on newer Supabase projects, o
 npm run dev         # Start local development server on http://localhost:3000
 npm run type-check  # Verify TypeScript compilation (tsc --noEmit)
 npm run lint        # ESLint (flat config in eslint.config.mjs)
-npm test            # Formula parity with Excel (scripts/test_formulas.mjs)
+npm test            # All tests (Vitest): logic, receipt reading, /api/ingest, database + RLS
+npm run test:watch  # Re-run tests as you edit
 npm run build       # Build optimized Next.js production bundle
 ```
 

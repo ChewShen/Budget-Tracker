@@ -61,10 +61,10 @@ Each entry covers what was chosen, why, and what it costs. For what changed and 
 - **Why:** `src/lib/mock-data.ts` generates plausible months of spending relative to today from a seeded random generator, so the demo always looks current and is the same on every load. Real figures were removed from the codebase and from git history (see [Privacy](#real-data-never-in-the-repo)).
 
 ### Migrations as dated, re-runnable SQL files
-- **Why:** `scripts/migrations/YYYY-MM-DD_name.sql`, run once in the Supabase SQL Editor in date order. Every file uses `IF NOT EXISTS` / `DROP … IF EXISTS`, so running one twice is harmless, and each ends with a check query that shows it worked.
+- **Why:** `scripts/migrations/YYYY-MM-DD_name.sql`, run once in the Supabase SQL Editor in the order the README lists them (files from the same day depend on each other, so file names alone don't give the order). Every file uses `IF NOT EXISTS` / `DROP … IF EXISTS`, so running one twice is harmless, and each ends with a check query that shows it worked.
 - **Missing tables are tolerated:** Optional features (bills, goals, budgets, reminders, savings accounts) keep the rest of the app working if their migration hasn't been run yet, and the error message names the file to run. Before the savings-accounts migration, the old balances are shown read-only.
 - **Old scripts can't undo new ones:** Once the multi-user migration has run, `secure_rls.sql` refuses to run and the older category and bill migrations skip the steps that would re-open or cross accounts, because "safe to re-run" has to stay true for every file.
-- **Tested against real Postgres first:** Each migration is replayed on a throwaway Postgres (PGlite) with the full migration history and checked as different users before it's shipped. That caught a bug where the savings migration would have created no accounts (`EXECUTE` doesn't set `FOUND` in PL/pgSQL). These tests aren't in CI yet; that's on the roadmap.
+- **Tested against real Postgres, in CI:** `tests/db/` replays the whole history on an in-memory Postgres (PGlite): the README's initial tables, an example import, `secure_rls.sql`, every migration in the README's order, then every migration again. It then signs in as two accounts and checks that neither can see, change or point at the other's data. This caught a bug where the savings migration would have created no accounts (`EXECUTE` doesn't set `FOUND` in PL/pgSQL), and found that the README's order, not the file names, is the real order.
 - **Trade-off:** No migration tool tracks what has run. For one database, maintained by one person, this is simpler than setting up a migration CLI.
 
 ### Savings accounts are rows, not columns
@@ -104,7 +104,7 @@ Each entry covers what was chosen, why, and what it costs. For what changed and 
 ## 4. Features
 
 ### Salary and interest maths match the spreadsheet
-- **Why:** The app replaced an Excel workbook, so EPF/SOCSO/EIS deductions and daily-compounded interest must give the same numbers. `npm test` (`scripts/test_formulas.mjs`) checks them against the Excel results, and CI runs it on every PR.
+- **Why:** The app replaced an Excel workbook, so EPF/SOCSO/EIS deductions and daily-compounded interest must give the same numbers. `tests/logic.test.ts` checks the app's own functions against the Excel results, and CI runs it on every push and PR.
 
 ### Month-end forecast: stretch only everyday spending
 - **Why:** A naive "spent so far ÷ days × month" makes the 1st of the month look terrible after rent. Bills and one-off purchases count once as they are, plus bills still to come. Only everyday spending is projected forward. The Budgets card uses the same rule (`src/lib/budgets.ts`).
@@ -158,6 +158,9 @@ Each entry covers what was chosen, why, and what it costs. For what changed and 
 ### Changes are verified the way they'll be used
 - Besides type-check and lint: UI changes are clicked through in headless Chrome (desktop and phone widths, via the DevTools protocol), server routes are run against an in-memory fake of Supabase, and push notifications were checked end to end through Google's push service. Bugs found this way are fixed before committing and mentioned in the commit.
 
-### CI runs only what Vercel doesn't
-- **Why:** Vercel already builds every push. GitHub Actions (`.github/workflows/ci.yml`) adds type-check, lint and the formula test on PRs to `dev` and `main`.
+### Automated tests in CI
+- **What:** Vitest (`npm test`, about a second): the money and date logic, receipt reading, the `/api/ingest` endpoint against a stand-in database, and the database itself on PGlite (migrations plus RLS between two accounts). GitHub Actions (`.github/workflows/ci.yml`) runs type-check, lint, the tests and a production build on every push to `chewshen`, `dev` and `main` and on PRs, so a ❌ shows before merging.
+- **Why these and not browser tests first:** These are what can quietly go wrong: money maths, privacy between accounts, and the parser that turns screenshots into expenses. They're fast and don't need a real Supabase or any secrets. Browser tests (Playwright) come later.
+- **Why tests import the app's own code:** The first formula test copied the formulas into the test file, so it checked the copy, not the app. Tests now import from `src/lib`.
+- **Example data only:** Test receipts and accounts use made-up names and numbers, like everything in the repo.
 - **Checks run on a clean checkout:** Before pushing, checks run in a separate worktree, so leftover local files (a running dev server's `.next`, uncommitted changes) can't hide a broken commit.

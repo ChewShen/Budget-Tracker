@@ -5,17 +5,11 @@ When one is picked up, move it to `docs/changelog.md` under the version that shi
 
 ---
 
-## Next up (agreed order, as of v0.21.0)
+## Next up (agreed order; automated tests shipped in v0.22.0)
 
-1. **Automated tests in CI.** Make the throwaway checks used so far permanent, so every PR runs them:
-   - **Database (PGlite):** replay every migration in `scripts/migrations/` in order on a real Postgres with a stand-in `auth` schema; check each person sees and changes only their own rows (categories/tags, expenses, bills, budgets, goals, savings, tokens, Inbox, rules), and that references to another person's tag/category/goal are refused. Include the migrations' own checks (e.g. savings before/after, auto-add skipping plans outside their months).
-   - **Parsing (`src/lib/ingest.ts`):** TnG history receipts and success screens in both reading orders (placeholder names, never real ones), transfers, banner-hidden amounts, payment time vs the status-bar clock, merchant keys and rules.
-   - **Endpoint (`/api/ingest`):** tokens (missing, revoked, cut short, header forms), double-taps and repeats, the 500-item cap, notification messages.
-   - **Logic:** forecast and budgets (`analytics.ts`, `budgets.ts`), instalments (`instalments.ts`), reminders (`reminders.ts`), savings snapshots and legacy conversion (`savings.ts`), the "Same as last entry" date rule.
-   - Later: Playwright browser tests of the main flows (add expense, Inbox confirm, record balances).
-2. **Manage merchant rules** (Settings → Automation): list what the Inbox has learned (e.g. MENG → Lunch, TEALIVE → Coffee), change a rule's tag, delete a rule. Today a wrong rule can only be fixed in the database.
-3. **Other income:** log bonuses, side income, refunds and money received, so the savings rate and the untracked-cash check stay right (only the fixed salary counts today). Transfers *in* could later arrive through the Inbox.
-4. **Bank alerts by email:** forward Maybank/CIMB card and DuitNow alert emails to a private address (needs an email-receiving service, e.g. Cloudflare Email Routing → a worker → `/api/ingest`), so card and online spending the TnG double-tap misses lands in the Inbox too.
+1. **Manage merchant rules** (Settings → Automation): list what the Inbox has learned (e.g. MENG → Lunch, TEALIVE → Coffee), change a rule's tag, delete a rule. Today a wrong rule can only be fixed in the database.
+2. **Other income:** log bonuses, side income, refunds and money received, so the savings rate and the untracked-cash check stay right (only the fixed salary counts today). Transfers *in* could later arrive through the Inbox.
+3. **Bank alerts by email:** forward Maybank/CIMB card and DuitNow alert emails to a private address (needs an email-receiving service, e.g. Cloudflare Email Routing → a worker → `/api/ingest`), so card and online spending the TnG double-tap misses lands in the Inbox too.
 
 ---
 
@@ -40,6 +34,8 @@ When one is picked up, move it to `docs/changelog.md` under the version that shi
 
 ## Robustness
 
+- **Browser tests (Playwright)** of the main flows (add expense, Inbox confirm, record balances), in CI next to the unit and database tests.
+- **Goal ownership on money set aside**: `goal_contributions` checks the owner but not that the goal is yours (the other "points at" checks do). Harmless in practice (another person's goal id is a random UUID you'd never see, and they don't see your rows), but worth a one-line policy for consistency, plus a test case.
 - **Recharts v3**: v2 is deprecated.
 
 ## Data housekeeping
