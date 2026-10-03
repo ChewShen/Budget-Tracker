@@ -15,6 +15,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.19.0] - 2026-10-03
+
+### Added
+- **Automation with iPhone Shortcuts**: send payments to the app instead of typing them. Double-tap the back of the phone on a TnG (or any) payment screen and it's read on the phone and sent; Apple Pay purchases can be sent automatically; or use Siri. Setup steps are in **Settings → Automation**.
+- **Personal tokens** (Settings → Automation): create one per Shortcut, shown once, with "Send a test", last-used time and **Revoke**. Only a hash is stored, and a token can only add to your own Inbox.
+- **Inbox**: captured expenses wait to be confirmed, with amount, merchant, date and a suggested tag filled in (all editable), the original text, Add / Dismiss and "Add all ready". Overview shows "N expenses to confirm" while any are waiting.
+- **Merchant rules**: confirming "GRAB → Grab" means the next Grab payment arrives already tagged, even from another branch.
+- **User guide** (`docs/user-guide.md`) covering every feature step by step, and **Settings → Help** with searchable short answers linking to it.
+
+### Database
+- New migration `scripts/migrations/2026-10-03_inbox.sql`: `api_tokens` (hashed), `inbox_items` and `merchant_rules`, owner-only. The `/api/ingest` endpoint needs `SUPABASE_SERVICE_ROLE_KEY` (already set for reminders).
+
+---
+
 ## [0.18.1] - 2026-10-01
 
 ### Added
