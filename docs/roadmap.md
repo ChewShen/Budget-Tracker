@@ -5,11 +5,10 @@ When one is picked up, move it to `docs/changelog.md` under the version that shi
 
 ---
 
-## Next up (agreed order; automated tests shipped in v0.22.0)
+## Next up (agreed order; tests shipped in v0.22.0, shops it remembers in v0.23.0)
 
-1. **Manage merchant rules** (Settings → Automation): list what the Inbox has learned (e.g. MENG → Lunch, TEALIVE → Coffee), change a rule's tag, delete a rule. Today a wrong rule can only be fixed in the database.
-2. **Other income:** log bonuses, side income, refunds and money received, so the savings rate and the untracked-cash check stay right (only the fixed salary counts today). Transfers *in* could later arrive through the Inbox.
-3. **Bank alerts by email:** forward Maybank/CIMB card and DuitNow alert emails to a private address (needs an email-receiving service, e.g. Cloudflare Email Routing → a worker → `/api/ingest`), so card and online spending the TnG double-tap misses lands in the Inbox too.
+1. **Other income:** log bonuses, side income, refunds and money received, so the savings rate and the untracked-cash check stay right (only the fixed salary counts today). Transfers *in* could later arrive through the Inbox.
+2. **Bank alerts by email:** forward Maybank/CIMB card and DuitNow alert emails to a private address (needs an email-receiving service, e.g. Cloudflare Email Routing → a worker → `/api/ingest`), so card and online spending the TnG double-tap misses lands in the Inbox too.
 
 ---
 

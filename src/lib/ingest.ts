@@ -187,12 +187,14 @@ export function merchantKey(m: string): string | null {
   return word ?? null;
 }
 
-// The tag to suggest for a merchant: the longest rule pattern found as a whole word in its name.
-export function suggestTagId(merchant: string | null, rules: { pattern: string; tag_id: string }[]): string | null {
+// The rule for a merchant: the longest pattern found as whole words in its name
+// ("GRAB FOOD" beats "GRAB" for "Grab Food KL").
+export function matchRule<R extends { pattern: string }>(merchant: string | null, rules: R[]): R | null {
   if (!merchant) return null;
   const words = ` ${normalizeMerchant(merchant)} `;
-  const hit = rules
-    .filter((r) => words.includes(` ${normalizeMerchant(r.pattern)} `))
-    .sort((a, b) => b.pattern.length - a.pattern.length)[0];
-  return hit?.tag_id ?? null;
+  return (
+    rules
+      .filter((r) => words.includes(` ${normalizeMerchant(r.pattern)} `))
+      .sort((a, b) => normalizeMerchant(b.pattern).length - normalizeMerchant(a.pattern).length)[0] ?? null
+  );
 }

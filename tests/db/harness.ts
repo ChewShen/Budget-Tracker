@@ -64,6 +64,14 @@ const LEGACY_DATA = `
     ('2026-08-01', 1200, 2100, 300, 5400);
 `;
 
+// Data a real account would have had by then, so later migrations are tested on it.
+const DATA_AFTER: Record<string, (ownerId: string) => string> = {
+  // A merchant rule from before rules had a category: the next migration fills in its tag's.
+  "2026-10-03_inbox.sql": (ownerId) => `
+    INSERT INTO public.merchant_rules (user_id, pattern, tag_id)
+    SELECT '${ownerId}', 'OLDRULE', id FROM public.tags WHERE user_id = '${ownerId}' AND name = 'Lunch';`,
+};
+
 export async function buildDatabase(): Promise<{ db: PGlite; ownerId: string }> {
   const db = await PGlite.create({ extensions: { uuid_ossp } });
   await run(db, "supabase-stub.sql", readFileSync(join(__dirname, "supabase-stub.sql"), "utf8"));
@@ -73,7 +81,10 @@ export async function buildDatabase(): Promise<{ db: PGlite; ownerId: string }> 
   const owner = await db.query<{ id: string }>("INSERT INTO auth.users (email) VALUES ($1) RETURNING id", [OWNER_EMAIL]);
   await run(db, "secure_rls.sql", read("scripts/secure_rls.sql").replace("'you@example.com'", `'${OWNER_EMAIL}'`));
 
-  for (const file of MIGRATIONS) await run(db, file, forPglite(read(`scripts/migrations/${file}`)));
+  for (const file of MIGRATIONS) {
+    await run(db, file, forPglite(read(`scripts/migrations/${file}`)));
+    if (DATA_AFTER[file]) await run(db, `data after ${file}`, DATA_AFTER[file](owner.rows[0].id));
+  }
   return { db, ownerId: owner.rows[0].id };
 }
 

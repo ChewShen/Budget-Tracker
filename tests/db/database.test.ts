@@ -55,7 +55,7 @@ beforeAll(async () => {
   await db.query("INSERT INTO reminder_log (user_id, key) VALUES ($1, 'bill:test')", [owner]);
   await db.query("INSERT INTO api_tokens (user_id, name, token_hash, token_prefix) VALUES ($1, 'Phone', 'hash', 'bt_abcdefg')", [owner]);
   await db.query("INSERT INTO inbox_items (user_id, amount, merchant, suggested_tag_id) VALUES ($1, 9.90, 'Test Cafe', $2)", [owner, lunch]);
-  await db.query("INSERT INTO merchant_rules (user_id, pattern, tag_id) VALUES ($1, 'TEST', $2)", [owner, lunch]);
+  await db.query("INSERT INTO merchant_rules (user_id, pattern, category_id, tag_id) VALUES ($1, 'TEST', $2, $3)", [owner, food, lunch]);
 }, 60_000);
 
 describe("migrations", () => {
@@ -97,6 +97,15 @@ describe("migrations", () => {
       { name: "Lunch", role: "lunch" },
     ]);
     expect(await one(db, "SELECT role FROM categories WHERE user_id = $1 AND name = 'Food'", [owner])).toEqual({ role: "food" });
+  });
+
+  it("gives existing merchant rules their tag's category", async () => {
+    const rule = await one<{ category: string; tag: string }>(
+      db,
+      `SELECT c.name AS category, t.name AS tag FROM merchant_rules r
+       JOIN categories c ON c.id = r.category_id JOIN tags t ON t.id = r.tag_id WHERE r.pattern = 'OLDRULE'`
+    );
+    expect(rule).toEqual({ category: "Food", tag: "Lunch" });
   });
 
   it("turns the old savings columns into accounts with the same net worth each month", async () => {
@@ -216,7 +225,8 @@ describe("privacy between accounts", () => {
       ["a bill with their tag", (o) => ["INSERT INTO recurring_sentinel (tag_id) VALUES ($1)", [o.tag]]],
       ["a bill linked to their goal", (o, m) => ["INSERT INTO recurring_sentinel (tag_id, goal_id) VALUES ($1, $2)", [m.tag, o.goal]]],
       ["a balance in their savings account", (o) => ["INSERT INTO savings_balances (account_id, month, balance) VALUES ($1, '2026-09-01', 1)", [o.account]]],
-      ["a merchant rule with their tag", (o) => ["INSERT INTO merchant_rules (pattern, tag_id) VALUES ('SNEAKY', $1)", [o.tag]]],
+      ["a merchant rule with their tag", (o, m) => ["INSERT INTO merchant_rules (pattern, category_id, tag_id) VALUES ('SNEAKY', $1, $2)", [m.category, o.tag]]],
+      ["a merchant rule in their category", (o) => ["INSERT INTO merchant_rules (pattern, category_id) VALUES ('SNEAKY2', $1)", [o.category]]],
       ["an Inbox item suggesting their tag", (o) => ["INSERT INTO inbox_items (suggested_tag_id) VALUES ($1)", [o.tag]]],
       ["an Inbox item suggesting their category", (o) => ["INSERT INTO inbox_items (suggested_category_id) VALUES ($1)", [o.category]]],
     ];
@@ -241,6 +251,23 @@ describe("privacy between accounts", () => {
           await tx.exec("ROLLBACK TO SAVEPOINT each"); // each case on its own (two bills can't share a tag)
         }
       });
+    });
+  });
+});
+
+describe("merchant rules", () => {
+  it("can remember a category on its own, or a tag in that category, but not a tag from another category", async () => {
+    await asUser(db, friend, async (tx) => {
+      const food = await idOf(tx, "SELECT id FROM categories WHERE name = 'Food'");
+      const grab = await one<{ id: string; category_id: string }>(tx, "SELECT id, category_id FROM tags WHERE name = 'Grab'");
+      await tx.query("INSERT INTO merchant_rules (pattern, category_id) VALUES ('TEALIVE', $1)", [food]);
+      await tx.query("INSERT INTO merchant_rules (pattern, category_id, tag_id) VALUES ('GRAB', $1, $2)", [grab.category_id, grab.id]);
+      await tx.query("SAVEPOINT mismatch");
+      await expect(
+        tx.query("INSERT INTO merchant_rules (pattern, category_id, tag_id) VALUES ('ODD', $1, $2)", [food, grab.id])
+      ).rejects.toThrow(/row-level security/);
+      await tx.query("ROLLBACK TO SAVEPOINT mismatch");
+      await expect(tx.query("INSERT INTO merchant_rules (pattern) VALUES ('NONE')")).rejects.toThrow(); // a category is required
     });
   });
 });
