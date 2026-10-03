@@ -7,7 +7,8 @@ import { Check, ChevronLeft, Copy, Inbox, X } from "lucide-react";
 import { useBudget } from "@/lib/budget-context";
 import { useInbox, type InboxItem } from "@/lib/automation";
 import { categoryLabel } from "@/lib/categories";
-import { merchantKey, parseCapture } from "@/lib/ingest";
+import { merchantKey, parseCapture, timeFromText } from "@/lib/ingest";
+import { foodCategory, MEAL_ROLES, mealForHour, mealTag } from "@/lib/roles";
 import { cn, formatCurrency } from "@/lib/utils";
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -20,10 +21,10 @@ const SOURCE_LABELS: Record<string, string> = {
 
 // Items keep the text that was read off the screen, so they're read again with the latest rules
 // here: an item captured before a parsing fix (e.g. a logo read as the merchant) fixes itself.
-type ReadItem = InboxItem & { isTransfer: boolean };
+type ReadItem = InboxItem & { isTransfer: boolean; paidAt: { hour: number; minute: number } | null };
 
 function reread(item: InboxItem): ReadItem {
-  if (!item.raw_text) return { ...item, isTransfer: false };
+  if (!item.raw_text) return { ...item, isTransfer: false, paidAt: null };
   const fresh = parseCapture({ text: item.raw_text }, format(new Date(), "yyyy-MM-dd"));
   return {
     ...item,
@@ -31,6 +32,7 @@ function reread(item: InboxItem): ReadItem {
     amount: item.amount ?? fresh.amount,
     occurred_on: fresh.date ?? item.occurred_on,
     isTransfer: fresh.isTransfer,
+    paidAt: timeFromText(item.raw_text),
   };
 }
 
@@ -40,7 +42,13 @@ interface Draft {
   categoryId: string;
   tagId: string;
   remember: boolean;
+  // Set when the tag is the time-of-day meal guess rather than a merchant rule or your choice;
+  // e.g. "guessed from the payment time (9:32 am)". Cleared once you pick a tag yourself.
+  guess: string | null;
 }
+
+const clock = (hour: number, minute: number) =>
+  format(new Date(2000, 0, 1, hour, minute), minute ? "h:mm a" : "h a").toLowerCase();
 
 const isMoney = (t: string) => /^\d*\.?\d{0,2}$/.test(t);
 
@@ -100,6 +108,13 @@ function InboxRow({
           <X className="h-4 w-4" />
         </button>
       </div>
+
+      {draft.guess && draft.tagId && (
+        <p className="mt-2 text-xs text-muted-foreground">
+          {categoryLabel(categories.find((c) => c.id === draft.categoryId)?.name)} ·{" "}
+          {tags.find((t) => t.id === draft.tagId)?.name}: {draft.guess}. Change it if it wasn&apos;t food.
+        </p>
+      )}
 
       {sameDay && (
         <p className="mt-2 rounded-lg bg-warning/10 px-3 py-2 text-xs text-warning">
@@ -224,7 +239,7 @@ function InboxRow({
 }
 
 export default function InboxPage() {
-  const { mode, tags, addTransaction, showToast } = useBudget();
+  const { mode, tags, categories, addTransaction, showToast } = useBudget();
   const isCloud = mode === "cloud";
   const { items: stored, isLoaded, error, resolve } = useInbox(isCloud);
   const items = useMemo(() => stored.map(reread), [stored]);
@@ -237,21 +252,43 @@ export default function InboxPage() {
       const next = { ...prev };
       for (const i of items) {
         if (next[i.id]) continue;
-        const tag = tags.find((t) => t.id === i.suggested_tag_id);
+        // 1. A merchant rule's tag. 2. Otherwise (not a transfer) Food and the meal for the time it
+        //    was paid, like Add expense does, marked as a guess. 3. Otherwise left for you to pick.
+        const ruleTag = tags.find((t) => t.id === i.suggested_tag_id);
+        let tag = ruleTag;
+        let guess: string | null = null;
+        if (!tag && !i.isTransfer) {
+          const when = i.paidAt ?? { hour: parseISO(i.created_at).getHours(), minute: parseISO(i.created_at).getMinutes() };
+          const meal = mealForHour(when.hour);
+          tag = mealTag(categories, tags, meal) ?? undefined;
+          if (!tag) {
+            const food = foodCategory(categories);
+            tag = food ? tags.find((t) => t.category_id === food.id) : undefined;
+          }
+          if (tag)
+            guess = `guessed from the ${i.paidAt ? "payment" : "sending"} time (${clock(when.hour, when.minute)}, ${
+              MEAL_ROLES.find((m) => m.role === meal)?.label.split(" (")[0]
+            })`;
+        }
         next[i.id] = {
           amount: i.amount ? String(i.amount) : "",
           date: i.occurred_on ?? format(new Date(), "yyyy-MM-dd"),
           categoryId: tag?.category_id ?? i.suggested_category_id ?? "",
           tagId: tag?.id ?? "",
-          remember: !tag, // learn new merchants; known ones are already remembered
+          remember: false, // saving a rule is your choice
+          guess,
         };
       }
       return next;
     });
-  }, [items, tags]);
+  }, [items, tags, categories]);
 
+  // Picking a category or tag yourself turns a guess into your choice.
   const update = (id: string, d: Partial<Draft>) =>
-    setDrafts((prev) => ({ ...prev, [id]: { ...prev[id], ...d, ...(d.tagId && d.tagId !== prev[id]?.tagId ? { remember: true } : {}) } }));
+    setDrafts((prev) => ({
+      ...prev,
+      [id]: { ...prev[id], ...d, ...(d.tagId !== undefined || d.categoryId !== undefined ? { guess: null } : {}) },
+    }));
 
   const confirm = async (item: ReadItem, quiet = false) => {
     const d = drafts[item.id];
@@ -271,9 +308,11 @@ export default function InboxPage() {
     return true;
   };
 
+  // "Add all" only takes items whose tag came from a merchant rule or from you: time-of-day guesses
+  // get one tap each, after you've seen them.
   const ready = items.filter((i) => {
     const d = drafts[i.id];
-    return d && parseFloat(d.amount) > 0 && d.tagId && d.date;
+    return d && parseFloat(d.amount) > 0 && d.tagId && d.date && !d.guess;
   });
 
   const confirmAll = async () => {

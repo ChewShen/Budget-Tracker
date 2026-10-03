@@ -15,6 +15,7 @@ const MAX_BODY = 8_000; // characters
 const MAX_PENDING = 500; // a runaway automation can't flood the Inbox
 
 const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
+const TOKEN_LENGTH = 46; // "bt_" + 43 characters (32 random bytes, base64url)
 // Errors also carry `message`, which the Shortcut shows as its notification.
 const fail = (error: string, status: number) => NextResponse.json({ ok: false, error, message: `Not added: ${error}` }, { status });
 // Nothing wrong, just nothing to add (an accidental double-tap): 200, so the Shortcut doesn't error.
@@ -46,13 +47,26 @@ export async function POST(request: NextRequest) {
 
   const { data: tok } = await db
     .from("api_tokens")
-    .select("id, user_id")
+    .select("id, user_id, revoked_at")
     .eq("token_hash", sha256(token))
-    .is("revoked_at", null)
     .maybeSingle();
+  // Say which problem it is, showing only the start of what was sent: enough to spot an old or
+  // cut-off token without echoing it.
+  const shown = `${token.slice(0, 7)}…`;
+  if (tok?.revoked_at) {
+    console.warn("[ingest] Refused: revoked token.");
+    return fail(
+      `This token (${shown}) was revoked. Paste your current token into the first box of the Log Payment shortcut.`,
+      401
+    );
+  }
   if (!tok) {
-    console.warn("[ingest] Refused: unknown or revoked token.");
-    return fail("Invalid or revoked token. Create a new one in Settings → Automation.", 401);
+    console.warn("[ingest] Refused: unknown token.");
+    const length = token.length === TOKEN_LENGTH ? "" : ` It's ${token.length} characters; a token has ${TOKEN_LENGTH}.`;
+    return fail(
+      `Token not recognised (starts ${shown}).${length} Copy it again from Settings → Automation, or create a new one.`,
+      401
+    );
   }
 
   // Body: JSON fields, or plain text (e.g. text read off a screenshot).
