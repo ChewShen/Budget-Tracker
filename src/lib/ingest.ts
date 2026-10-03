@@ -52,7 +52,7 @@ export function amountFromText(text: string): number | null {
 // A whole-word label at the start of a line, then the name (or nothing: the name is elsewhere).
 // "Recipient" counts only on its own or as "Recipient name": "Recipient Bank/ E-Wallet" is the bank.
 const MERCHANT_LABEL =
-  /^\s*(?:paid to|pay to|payment to|merchant(?: name)?|payee|receiver(?: name)?|recipient(?: name)?(?=\s*(?:[:\-]|$))|to|at)\b\s*[:\-]?\s*(.*)$/i;
+  /^\s*(?:paid to|pay to|payment to|transfer to|merchant(?: name)?|payee|receiver(?: name)?|recipient(?: name)?(?=\s*(?:[:\-]|$))|to|at)\b\s*[:\-]?\s*(.*)$/i;
 // TnG's "Payment Details" value: "Payment - MENG KEE CHAR SIEW RESTAURANT" (may wrap onto two lines).
 const PAYMENT_DASH = /^payment\s*[-–—:]\s*(.+)$/i;
 // Row labels on receipt screens. Screen reading often lists a column of labels and then their
@@ -60,7 +60,7 @@ const PAYMENT_DASH = /^payment\s*[-–—:]\s*(.+)$/i;
 // TnG history receipts (Merchant, Payment Details, Wallet Ref…) and success screens right after
 // paying or transferring (Receiver, Transfer to, Recipient Bank/ E-Wallet, DuitNow Ref No.…).
 const RECEIPT_LABEL =
-  /^(transaction type|merchant(?: name)?|payment details|payment method|date\s*(?:\/|&|and)\s*time|date|time|wallet ref|status|transaction no\.?|reference(?: no\.?)?|ref(?: no\.?)?|duitnow ref(?: no\.?)?|details|amount|total|recipient(?: name)?|receiver(?: name)?|payee|transfer to|transfer type|recipient bank\/?(?:\s*e-wallet)?|e-wallet|account number|account no\.?|remark|remarks|done|transferred|paid|payment successful)$/i;
+  /^(transaction type|merchant(?: name)?|payment details|payment method|date\s*(?:\/|&|and)\s*time|date|time|wallet ref|status|transaction no\.?|reference(?: no\.?)?|ref(?: no\.?)?|duitnow ref(?: no\.?)?|details|amount|total|recipient(?: name)?|receiver(?: name)?|payee|transfer to|transfer type|recipient bank\/?(?:\s*e-wallet)?|e-wallet|account number|account no\.?|id type|remark|remarks|done|transferred|paid|payment successful)$/i;
 // Values on the same screens that are never the merchant.
 // (Long digit runs are reference numbers; a line of only digits and separators is a date or time.)
 const NOT_A_MERCHANT =
