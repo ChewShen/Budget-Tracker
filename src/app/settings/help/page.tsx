@@ -37,7 +37,7 @@ const TOPICS: Topic[] = [
     title: "Which date new expenses start on",
     anchor: "2-adding-expenses",
     points: [
-      "Settings → General → Adding expenses.",
+      "Settings → Preferences → Adding expenses.",
       "Today: always today. Same as last entry: stays on the date you last used until that day has a Dinner or Supper entry, then moves to the next day (never past today).",
     ],
   },

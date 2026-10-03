@@ -48,7 +48,7 @@ Tap **+** (phone) or **Add expense** (computer).
 
 **It picks the meal for you.** Around breakfast, lunch, tea time, dinner and late night, the sheet opens on that meal's tag already selected.
 
-**Which date it starts on.** **Settings → General → Adding expenses**:
+**Which date it starts on.** **Settings → Preferences → Adding expenses**:
 - **Today**: always today.
 - **Same as last entry**: for catching up on past days in order. It stays on the date you last used until that day has a **Dinner** or **Supper** entry, then moves on to the next day (never past today).
 
