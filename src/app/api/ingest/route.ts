@@ -18,7 +18,12 @@ const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
 // Errors also carry `message`, which the Shortcut shows as its notification.
 const fail = (error: string, status: number) => NextResponse.json({ ok: false, error, message: `Not added: ${error}` }, { status });
 // Nothing wrong, just nothing to add (an accidental double-tap): 200, so the Shortcut doesn't error.
-const skip = (reason: string) => NextResponse.json({ ok: false, skipped: true, message: `Not added: ${reason}` });
+// When the payment was read, its amount and name go on the first line and the reason below, so a
+// long shop name isn't cut short by the status.
+const skip = (reason: string, what?: string) =>
+  NextResponse.json({ ok: false, skipped: true, message: [what, `Not added: ${reason}`].filter(Boolean).join("\n") });
+// "RM 10.00 · MENG KEE CHAR SIEW RESTAURANT": the first line of the Shortcut's notification.
+const describe = (amount: number, merchant: string | null) => [formatCurrency(amount), merchant].filter(Boolean).join(" · ");
 const REPEAT_WINDOW_MS = 10 * 60 * 1000; // same amount, merchant and date sent again within 10 minutes
 
 export async function POST(request: NextRequest) {
@@ -80,7 +85,10 @@ export async function POST(request: NextRequest) {
       .limit(1);
     // (refError: the reference migration hasn't been run yet; the time-window check below still works.)
     if (!refError && same?.length)
-      return skip(same[0].status === "pending" ? "already in your Inbox." : "you've already handled this one.");
+      return skip(
+        same[0].status === "pending" ? "already in your Inbox." : "you've already handled this one.",
+        describe(captured.amount, captured.merchant)
+      );
   }
   // No reference (Apple Pay, Siri): the same amount, merchant and date a moment ago is a repeat.
   // (With references, a new one means a new payment, e.g. two RM 10 meals at the same stall.)
@@ -92,7 +100,8 @@ export async function POST(request: NextRequest) {
       .eq("amount", captured.amount)
       .eq("occurred_on", occurredOn)
       .gte("created_at", new Date(Date.now() - REPEAT_WINDOW_MS).toISOString());
-    if (recent?.some((r) => (r.merchant ?? "") === (captured.merchant ?? ""))) return skip("already sent a moment ago.");
+    if (recent?.some((r) => (r.merchant ?? "") === (captured.merchant ?? "")))
+      return skip("already sent a moment ago.", describe(captured.amount, captured.merchant));
   }
 
   // Suggest a tag from the owner's merchant rules (and file it under that tag's category).
@@ -122,14 +131,13 @@ export async function POST(request: NextRequest) {
   }
   await db.from("api_tokens").update({ last_used_at: new Date().toISOString() }).eq("id", tok.id);
 
-  // One line a Shortcut can show as a notification.
-  const where = [captured.merchant, tag ? `→ ${tag.name}` : null].filter(Boolean).join(" ");
-  const message = [formatCurrency(captured.amount), where, captured.isTransfer ? "transfer" : null]
+  // The Shortcut's notification: what was paid on the first line, what happened below it.
+  const status = ["Added to Inbox", tag ? `→ ${tag.name}` : null, captured.isTransfer ? "(transfer)" : null]
     .filter(Boolean)
-    .join(" · ");
+    .join(" ");
   return NextResponse.json({
     ok: true,
-    message: `${message} · added to Inbox`,
+    message: `${describe(captured.amount, captured.merchant)}\n${status}`,
     amount: captured.amount,
     merchant: captured.merchant,
     date: occurredOn,

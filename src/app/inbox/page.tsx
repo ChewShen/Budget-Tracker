@@ -73,15 +73,7 @@ function InboxRow({
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
             <span className="truncate text-sm font-semibold">{item.merchant || "Unknown merchant"}</span>
-            {sameDay && (
-        <p className="mt-2 rounded-lg bg-warning/10 px-3 py-2 text-xs text-warning">
-          You already have {formatCurrency(sameDay.amount)} on {format(parseISO(sameDay.date), "d MMM")} (
-          {categoryLabel(sameDay.category_name ?? categories.find((c) => c.id === sameDay.category_id)?.name)} ·{" "}
-          {sameDay.tag_name ?? tags.find((t) => t.id === sameDay.tag_id)?.name}). Dismiss this if it&apos;s the same one.
-        </p>
-      )}
-
-      {item.isTransfer && (
+            {item.isTransfer && (
               <span className="shrink-0 rounded-full border px-1.5 py-px text-[10px] font-medium text-muted-foreground">
                 Transfer
               </span>
@@ -108,6 +100,14 @@ function InboxRow({
           <X className="h-4 w-4" />
         </button>
       </div>
+
+      {sameDay && (
+        <p className="mt-2 rounded-lg bg-warning/10 px-3 py-2 text-xs text-warning">
+          You already have {formatCurrency(sameDay.amount)} on {format(parseISO(sameDay.date), "d MMM")} (
+          {categoryLabel(sameDay.category_name ?? categories.find((c) => c.id === sameDay.category_id)?.name)} ·{" "}
+          {sameDay.tag_name ?? tags.find((t) => t.id === sameDay.tag_id)?.name}). Dismiss this if it&apos;s the same one.
+        </p>
+      )}
 
       {item.isTransfer && (
         <p className="mt-2 text-xs text-muted-foreground">
