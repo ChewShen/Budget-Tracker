@@ -11,9 +11,21 @@ interface Topic {
   title: string;
   anchor: string; // section in the full guide
   points: string[];
+  images?: { src: string; alt: string }[]; // from /public/help
 }
 
 const TOPICS: Topic[] = [
+  {
+    title: "Quick start",
+    anchor: "quick-start",
+    points: [
+      "Install it: iPhone Safari → Share → Add to Home Screen; Android Chrome → ⋮ → Install app.",
+      "Change your temporary password in Settings → Account.",
+      "Add an expense: tap +, type the amount, tap a category and tag, Save.",
+      "Set up once, under Money in Settings: salary, savings accounts, monthly bills and (optional) budgets.",
+      "Optional: let your iPhone send TnG payments for you (see Automation below).",
+    ],
+  },
   {
     title: "Getting started",
     anchor: "1-getting-started",
@@ -113,15 +125,23 @@ const TOPICS: Topic[] = [
     ],
   },
   {
-    title: "Automation, Shortcuts and the Inbox",
+    title: "Automation: TnG payments with a double-tap",
     anchor: "11-automation-and-the-inbox",
     points: [
-      "Settings → Automation → Create token (copy it now, it's shown once), then follow the Shortcut steps there.",
-      "TnG: after paying, double-tap the back of your iPhone on the success screen. Apple Pay can be sent automatically.",
-      "Everything lands in the Inbox to confirm. Tick \"suggest this tag next time\" and that merchant arrives tagged from then on.",
+      "1. Settings → Automation → Create token, then copy it (it's shown once).",
+      "2. Tap Add the Shortcut → Get Shortcut → Set Up Shortcut, and paste the token. (No button yet? Use Build it yourself on that page.)",
+      "3. iPhone Settings → Accessibility → Touch → Back Tap → Double Tap → Log Payment, and turn Show Banner off.",
+      "Try it: open a TnG receipt and double-tap the back of your phone. Then confirm it in the Inbox.",
+      "Tick \"suggest this tag next time\" and that shop's payments arrive already tagged.",
       "Items labelled Transfer may be money moved to your own account. That isn't spending, so dismiss them.",
       "Double-tapped by accident? Screens without an amount and receipts already sent aren't added.",
       "Lost your phone? Revoke the token.",
+    ],
+    images: [
+      { src: "/help/automation.png", alt: "Settings → Automation: the 3 setup steps" },
+      { src: "/help/back-tap.png", alt: "Back Tap: Double Tap set to Log Payment" },
+      { src: "/help/notification.png", alt: "Notification after a double-tap" },
+      { src: "/help/inbox.png", alt: "An Inbox item ready to add" },
     ],
   },
   {
@@ -147,7 +167,8 @@ const TOPICS: Topic[] = [
       "Old version after an update: close the home-screen app completely and reopen it.",
       "No reminders: check Settings → Reminders shows On and Send a test arrives; on iPhone use the home-screen app.",
       "\"Run the latest migrations\": the app was updated but its database wasn't yet. Tell whoever runs it.",
-      "Shortcut says \"Invalid or revoked token\": create a new token and use it as Bearer <token>.",
+      "Shortcut says \"Missing token\" or \"Invalid or revoked token\": create a new token and add the Shortcut again (it asks for the token).",
+      "\"No amount found\" on a real receipt: turn Show Banner off in Back Tap; the banner can cover the amount.",
     ],
   },
 ];
@@ -199,6 +220,20 @@ export default function HelpPage() {
                       </li>
                     ))}
                   </ul>
+                  {t.images && (
+                    <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      {t.images.map((img) => (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          key={img.src}
+                          src={img.src}
+                          alt={img.alt}
+                          loading="lazy"
+                          className="w-full rounded-xl border"
+                        />
+                      ))}
+                    </div>
+                  )}
                   <a
                     href={`${GUIDE}#${t.anchor}`}
                     target="_blank"

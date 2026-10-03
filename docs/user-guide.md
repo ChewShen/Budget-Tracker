@@ -2,6 +2,16 @@
 
 How to use the Budget Tracker day to day. For setting up your own copy of the app (Supabase, Vercel, migrations), see the [README](../README.md).
 
+## Quick start
+
+1. **Install it on your phone.** iPhone: open the site in Safari → Share → **Add to Home Screen**. Android: Chrome → ⋮ → **Install app**.
+2. **Sign in** and change your temporary password: **Settings → Account → Change password**.
+3. **Add an expense:** tap **+**, type the amount, tap a category and tag, **Save**.
+4. **Set up the money side once**, in Settings under **Money**: Salary & deductions, Savings accounts, Monthly bills and (optional) Budgets.
+5. **Optional, saves the most typing:** let your iPhone send TnG payments for you. See [Automation](#11-automation-and-the-inbox) (about 3 minutes).
+
+Then just open the app each day: Overview shows where your month is heading.
+
 **Contents**
 
 1. [Getting started](#1-getting-started)
@@ -170,24 +180,61 @@ Phone notifications around **8pm** (Malaysia time) when something needs you:
 
 ## 11. Automation and the Inbox
 
-Let your iPhone send payments to the app instead of typing them. Everything arrives in the **Inbox** for you to confirm, so nothing goes into your spending unchecked.
+After paying with TnG (or anything that shows a receipt), **double-tap the back of your iPhone**. The payment is read off the screen and sent to your **Inbox**, where you confirm it with one tap. Nothing goes into your spending until you do.
 
-**1. Create a token.** **Settings → Automation → Create token**. Copy it straight away (it's shown once). **Send a test to the Inbox** checks it works.
+### Set up in 3 steps (about 3 minutes)
 
-**2. Make the Shortcut** (the steps are also on that page):
-- **TnG or any payment screen:** in the Shortcuts app, make a shortcut with **Take Screenshot** → **Extract Text from Screenshot** → **Get Contents of URL** (the URL from Settings, method POST, header `Authorization` = `Bearer <your token>`, JSON body `text` = the extracted text and `source` = `tng`) → **Show Notification**. Then set **Settings → Accessibility → Touch → Back Tap → Double Tap** to run it. After paying, double-tap the back of your phone on the success screen. The screen is read on your phone; only the text is sent.
-- **Apple Pay (automatic):** Shortcuts → **Automation** → **Transaction** → your cards → Run Immediately, sending `amount`, `merchant` and `source` = `applepay`.
-- **Siri:** a shortcut that asks for an amount and what it was, named e.g. "Log expense".
+**1. Create your token.** In the app: **Settings → Automation → Create token**, then tap the copy button. The token is shown only once. **Send a test to the Inbox** checks it works.
 
-**3. Confirm in the Inbox.** Overview shows **"N expenses to confirm"**; tap it (or go to `/inbox`). Each item has the amount, merchant and date filled in where they could be read, and a tag if the merchant is known. Fix anything, then **Add**, or **×** to dismiss. **Add all ready** confirms every complete item. **original** shows exactly what was read.
+<img src="../public/help/automation.png" alt="Settings → Automation: the 3 setup steps" width="320">
 
-**Works on both TnG screens:** the success screen right after you pay, and a receipt opened later from your transaction history (it uses the receipt's own date and time). **Transfers** (e.g. DuitNow Transfer to a bank account) are labelled *Transfer*: moving money to your own account isn't spending, so dismiss those; money sent to someone for something you bought, add as usual.
+**2. Add the Log Payment Shortcut.** Tap **Add the Shortcut** in step 2 of that page. On your iPhone tap **Get Shortcut**, then **Set Up Shortcut**, and paste your token when it asks.
 
-**Accidental double-taps are ignored.** On a screen with no amount (your home screen, a chat), nothing is added and the notification says *"Not added: no amount found on this screen"*. The same receipt sent twice is only added once, even after you've confirmed it; an Apple Pay or Siri entry with the same amount, merchant and date within 10 minutes counts as a repeat. If an Inbox item matches an expense you already have that day, it says so, so you can dismiss it.
+<img src="../public/help/shortcut-get.png" alt="The Log Payment Shortcut, ready to add" width="240">
 
-**It learns your merchants.** With **"Next time, suggest this tag for …"** ticked, confirming "GRAB → Grab" means the next Grab payment arrives already tagged, even from another branch.
+*(If there's no Add the Shortcut button yet, open **Build it yourself** on the same page and follow the six steps; it takes about two minutes.)*
 
-**Keep it safe.** A token can only add items to *your* Inbox; it can't read anything. If you lose your phone, **Revoke** the token in Settings → Automation.
+**3. Turn on Back Tap.** iPhone **Settings → Accessibility → Touch → Back Tap → Double Tap → Log Payment**. On the same screen, turn **Show Banner off**: otherwise the banner can cover the amount at the top of the receipt when the screen is read.
+
+<img src="../public/help/back-tap.png" alt="Back Tap: Double Tap set to Log Payment" width="320">
+
+### Try it
+
+Open a TnG receipt (TnG app → **Activity** → any payment) and double-tap the back of your phone. A notification shows what was read:
+
+<img src="../public/help/notification.png" alt="Notification: RM 10.00 · Asian Food and Dessert, Added to Inbox" width="320">
+
+It works on the success screen right after you pay, and on receipts opened later from your history (the receipt's own date and time are used).
+
+### Confirm in the Inbox
+
+Overview shows **"N expenses to confirm"**; tap it. Each item has the amount, shop, date and (once it knows the shop) a tag filled in. Check them, then **Add**, or **×** if it isn't an expense. **Add all ready** confirms every complete item at once.
+
+<img src="../public/help/inbox.png" alt="An Inbox item: amount, date, category and tag filled in" width="320">
+
+- **It learns your shops.** Tick **"Next time, suggest this tag for …"** and that shop's payments arrive already tagged.
+- **Transfers** (e.g. a DuitNow Transfer to your own bank) are labelled *Transfer*. Moving money between your own accounts isn't spending, so dismiss those.
+- **Already have it?** If an item matches an expense you already have that day, it says so, so you can dismiss it.
+- **original** shows exactly what was read from the screen, with a **Copy** button.
+
+### What the notification means
+
+| Notification | Meaning |
+|---|---|
+| **RM 10.00 · Shop** / Added to Inbox | Ready to confirm in the Inbox |
+| … / **Added to Inbox: fill in the amount** | A receipt, but the amount couldn't be read (often hidden by the Back Tap banner). Fill it in in the Inbox |
+| **Not added: no amount found on this screen** | You double-tapped on something that isn't a receipt; nothing was added |
+| **Not added: already in your Inbox** / **already handled** | The same receipt was sent before |
+| **Not added: Invalid or revoked token…** | The token in your Shortcut is wrong or was revoked. Create a new one and set up the Shortcut again |
+
+### Apple Pay and Siri (optional)
+
+- **Apple Pay, automatic:** Shortcuts app → **Automation** → **+** → **Transaction** → choose your cards → **Run Immediately**, sending the purchase's **Amount** and **Merchant**. Settings → Automation has the details.
+- **Siri:** a shortcut that asks for an amount and what it was, named e.g. "Log expense". Then say "Hey Siri, log expense".
+
+### Keep it safe
+
+A token can only **add** items to *your* Inbox; it can't read anything. If you lose your phone, **Revoke** it in Settings → Automation and create a new one.
 
 ---
 
@@ -224,7 +271,9 @@ Let your iPhone send payments to the app instead of typing them. Everything arri
 
 **A message says "Run the latest migrations in Supabase first".** The app was updated but its database wasn't yet. Whoever runs the app needs to run the newest file in `scripts/migrations/`.
 
-**My Shortcut says "Invalid or revoked token".** Create a new token in Settings → Automation and paste it into the Shortcut's `Authorization` header as `Bearer <token>` (with the space).
+**The Shortcut says "Missing token" or "Invalid or revoked token".** Create a new token in Settings → Automation. Then either add the Shortcut again (it asks for the token), or open it in the Shortcuts app and paste the token as the value of the `x-api-token` header in *Get Contents of URL* (left box `x-api-token`, right box the token).
+
+**"Not added: no amount found" on a real receipt.** Turn **Show Banner** off in Back Tap (iPhone Settings → Accessibility → Touch → Back Tap): the banner can cover the amount at the top. Make sure the amount is on screen when you double-tap.
 
 **The Inbox got the amount or merchant wrong.** Fix it before adding; tap **original** to see what was read. Payment screens differ, and parsing improves over time.
 
