@@ -1,7 +1,8 @@
 import { createHash } from "crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { formatCurrency } from "@/lib/utils";
-import { parseCapture, referenceFromText, suggestTagId } from "@/lib/ingest";
+import { matchRule, parseCapture, referenceFromText, timeFromText } from "@/lib/ingest";
+import { mealForHour } from "@/lib/roles";
 import { createAdminClient, todayInMalaysia } from "@/lib/push-server";
 
 // Adds a captured expense to the token owner's Inbox (Settings → Automation explains the
@@ -27,6 +28,20 @@ const skip = (reason: string, what?: string) =>
 const describe = (amount: number | null, merchant: string | null) =>
   [amount ? formatCurrency(amount) : "Amount not found", merchant].filter(Boolean).join(" · ");
 const REPEAT_WINDOW_MS = 10 * 60 * 1000; // same amount, merchant and date sent again within 10 minutes
+
+const hourInMalaysia = () =>
+  Number(new Intl.DateTimeFormat("en-GB", { hour: "numeric", hourCycle: "h23", timeZone: "Asia/Kuala_Lumpur" }).format(new Date()));
+
+type Db = NonNullable<ReturnType<typeof createAdminClient>>;
+type Rule = { pattern: string; tag_id: string | null; category_id: string | null };
+
+// The owner's rules. Before 2026-10-04_merchant_rule_categories.sql they only have a tag.
+async function loadRules(db: Db, userId: string): Promise<Rule[]> {
+  const res = await db.from("merchant_rules").select("pattern, tag_id, category_id").eq("user_id", userId);
+  if (!res.error) return (res.data || []) as Rule[];
+  const old = await db.from("merchant_rules").select("pattern, tag_id").eq("user_id", userId);
+  return ((old.data || []) as { pattern: string; tag_id: string }[]).map((r) => ({ ...r, category_id: null }));
+}
 
 export async function POST(request: NextRequest) {
   // The token can come as "x-api-token: bt_…" (easiest in a shared Shortcut), "Authorization: Bearer bt_…",
@@ -127,12 +142,27 @@ export async function POST(request: NextRequest) {
       return skip("already sent a moment ago.", describe(captured.amount, captured.merchant));
   }
 
-  // Suggest a tag from the owner's merchant rules (and file it under that tag's category).
-  const { data: rules } = await db.from("merchant_rules").select("pattern, tag_id").eq("user_id", userId);
-  const tagId = suggestTagId(captured.merchant, rules || []);
-  const { data: tag } = tagId
-    ? await db.from("tags").select("id, name, category_id").eq("id", tagId).eq("user_id", userId).maybeSingle()
-    : { data: null };
+  // Suggest from the owner's merchant rules: the rule's tag, or for a shop remembered as Food alone,
+  // the meal for the payment time (as the Inbox does); for another category alone, just the category.
+  const rules = await loadRules(db, userId);
+  const rule = matchRule(captured.merchant, rules);
+  let tag: { id: string; name: string; category_id: string } | null = null;
+  let category: { id: string; name: string; role: string | null } | null = null;
+  if (rule?.tag_id) {
+    ({ data: tag } = await db.from("tags").select("id, name, category_id").eq("id", rule.tag_id).eq("user_id", userId).maybeSingle());
+  } else if (rule?.category_id) {
+    ({ data: category } = await db.from("categories").select("id, name, role").eq("id", rule.category_id).eq("user_id", userId).maybeSingle());
+    if (category?.role === "food") {
+      const hour = (rawText ? timeFromText(rawText)?.hour : undefined) ?? hourInMalaysia();
+      ({ data: tag } = await db
+        .from("tags")
+        .select("id, name, category_id")
+        .eq("user_id", userId)
+        .eq("category_id", category.id)
+        .eq("role", mealForHour(hour))
+        .maybeSingle());
+    }
+  }
 
   const source = typeof input.source === "string" && /^[a-z][a-z0-9_-]{0,19}$/i.test(input.source) ? input.source.toLowerCase() : "shortcut";
   const row = {
@@ -143,7 +173,7 @@ export async function POST(request: NextRequest) {
     merchant: captured.merchant,
     occurred_on: occurredOn,
     suggested_tag_id: tag?.id ?? null,
-    suggested_category_id: tag?.category_id ?? null,
+    suggested_category_id: tag?.category_id ?? category?.id ?? null,
   };
   let { error } = await db.from("inbox_items").insert({ ...row, reference });
   // Before 2026-10-03_inbox_reference.sql there's no reference column: save without it.
@@ -157,7 +187,7 @@ export async function POST(request: NextRequest) {
   // The Shortcut's notification: what was paid on the first line, what happened below it.
   const status = [
     captured.amount ? "Added to Inbox" : "Added to Inbox: fill in the amount",
-    tag ? `→ ${tag.name}` : null,
+    tag ? `→ ${tag.name}` : category ? `→ ${category.name.replace(/_/g, " ")}` : null,
     captured.isTransfer ? "(transfer)" : null,
   ]
     .filter(Boolean)
@@ -169,6 +199,7 @@ export async function POST(request: NextRequest) {
     merchant: captured.merchant,
     date: occurredOn,
     tag: tag?.name ?? null,
+    category: category?.name ?? null,
     pending: (count ?? 0) + 1,
   });
 }

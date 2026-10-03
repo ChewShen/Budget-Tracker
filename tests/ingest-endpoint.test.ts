@@ -116,8 +116,16 @@ beforeEach(() => {
     { id: "t1", user_id: USER, token_hash: hash(TOKEN), revoked_at: null },
     { id: "t2", user_id: USER, token_hash: hash(REVOKED), revoked_at: "2026-10-01T00:00:00Z" },
   ];
-  tables.tags = [{ id: "tag-lunch", name: "Lunch", category_id: "cat-food", user_id: USER }];
-  tables.merchant_rules = [{ pattern: "CONTOH", tag_id: "tag-lunch", user_id: USER }];
+  tables.categories = [
+    { id: "cat-food", name: "Food", role: "food", user_id: USER },
+    { id: "cat-shop", name: "Shopping", role: null, user_id: USER },
+  ];
+  tables.tags = [
+    { id: "tag-lunch", name: "Lunch", category_id: "cat-food", role: "lunch", user_id: USER },
+    { id: "tag-dinner", name: "Dinner", category_id: "cat-food", role: "dinner", user_id: USER },
+    { id: "tag-clothes", name: "Clothes", category_id: "cat-shop", role: null, user_id: USER },
+  ];
+  tables.merchant_rules = [{ pattern: "CONTOH", category_id: "cat-food", tag_id: "tag-lunch", user_id: USER }];
 });
 
 describe("tokens", () => {
@@ -208,6 +216,30 @@ describe("adding to the Inbox", () => {
     const res = await send({ text: RECEIPT });
     expect(res.status).toBe(429);
     expect(tables.inbox_items).toHaveLength(500);
+  });
+});
+
+describe("shops it remembers", () => {
+  it("uses the meal for the payment time when a shop is remembered as Food alone", async () => {
+    tables.merchant_rules = [{ pattern: "CONTOH", category_id: "cat-food", tag_id: null, user_id: USER }];
+    const res = await send({ text: RECEIPT }); // paid at 7:15 PM
+    expect(res.message).toBe("RM 8.50 · KEDAI CONTOH\nAdded to Inbox → Dinner");
+    expect(tables.inbox_items[0]).toMatchObject({ suggested_category_id: "cat-food", suggested_tag_id: "tag-dinner" });
+  });
+
+  it("files a shop remembered as another category alone under that category, leaving the tag", async () => {
+    tables.merchant_rules = [{ pattern: "CONTOH", category_id: "cat-shop", tag_id: null, user_id: USER }];
+    const res = await send({ text: RECEIPT });
+    expect(res.message).toBe("RM 8.50 · KEDAI CONTOH\nAdded to Inbox → Shopping");
+    expect(tables.inbox_items[0]).toMatchObject({ suggested_category_id: "cat-shop", suggested_tag_id: null });
+  });
+
+  it("ignores rules pointing at someone else's tag", async () => {
+    tables.tags.push({ id: "tag-other", name: "Other", category_id: "cat-x", role: null, user_id: "user-2" });
+    tables.merchant_rules = [{ pattern: "CONTOH", category_id: "cat-x", tag_id: "tag-other", user_id: USER }];
+    const res = await send({ text: RECEIPT });
+    expect(res.message).toBe("RM 8.50 · KEDAI CONTOH\nAdded to Inbox");
+    expect(tables.inbox_items[0]).toMatchObject({ suggested_category_id: null, suggested_tag_id: null });
   });
 });
 

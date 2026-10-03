@@ -2,13 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   amountFromText,
   looksLikeTransfer,
+  matchRule,
   merchantFromText,
   merchantKey,
   parseAmount,
   parseCapture,
   parseDate,
   referenceFromText,
-  suggestTagId,
   timeFromText,
 } from "@/lib/ingest";
 
@@ -182,15 +182,15 @@ describe("merchant rules", () => {
     expect(merchantKey("99 & 7")).toBeNull();
   });
 
-  it("suggests the tag of the longest matching rule, on whole words", () => {
+  it("picks the longest matching rule, on whole words", () => {
     const rules = [
       { pattern: "GRAB", tag_id: "ride" },
       { pattern: "GRAB FOOD", tag_id: "food" },
       { pattern: "TEA", tag_id: "drinks" },
     ];
-    expect(suggestTagId("GRAB* A-1234", rules)).toBe("ride");
-    expect(suggestTagId("Grab Food KL", rules)).toBe("food");
-    expect(suggestTagId("TEALIVE", rules)).toBeNull(); // "TEA" isn't a whole word here
-    expect(suggestTagId(null, rules)).toBeNull();
+    expect(matchRule("GRAB* A-1234", rules)?.tag_id).toBe("ride");
+    expect(matchRule("Grab Food KL", rules)?.tag_id).toBe("food");
+    expect(matchRule("TEALIVE", rules)).toBeNull(); // "TEA" isn't a whole word here
+    expect(matchRule(null, rules)).toBeNull();
   });
 });

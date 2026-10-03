@@ -6,6 +6,7 @@ import { format, parseISO } from "date-fns";
 import { ChevronDown, Copy, ExternalLink, KeyRound, Plus } from "lucide-react";
 import { useBudget } from "@/lib/budget-context";
 import { SHORTCUT_URL, useApiTokens } from "@/lib/automation";
+import { MerchantRulesManager } from "@/components/merchant-rules-manager";
 
 function Step({ n, title, children }: { n: number; title: string; children?: React.ReactNode }) {
   return (
@@ -225,6 +226,8 @@ export default function AutomationSettingsPage() {
         </section>
       )}
 
+      <MerchantRulesManager />
+
       <section className="card p-5 sm:p-6">
         <details className="group">
           <summary className="flex cursor-pointer list-none items-center justify-between gap-3 [&::-webkit-details-marker]:hidden">
@@ -294,7 +297,8 @@ export default function AutomationSettingsPage() {
           </li>
         </ul>
         <p className="mt-3 text-xs text-muted-foreground">
-          When you confirm an item in the Inbox, the app remembers that merchant&apos;s tag and suggests it next time.
+          Tick <strong className="text-foreground">Remember</strong> when adding an Inbox item and that shop&apos;s
+          payments arrive already sorted (see Shops it remembers above).
         </p>
       </section>
     </>

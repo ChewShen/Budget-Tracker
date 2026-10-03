@@ -211,15 +211,20 @@ It works on the success screen right after you pay, and on receipts opened later
 ### Confirm in the Inbox
 
 Overview shows **"N expenses to confirm"**; tap it. Each item has the amount, shop and date filled in, plus a category and tag:
-- a shop you've taught it (see below) gets **its own tag**;
+- a shop it remembers (see below) gets **what you taught it**: a category and tag (e.g. GRAB → Transport · Grab), or just **Food**, with the meal for the time you paid;
 - otherwise it's set to **Food** and the **meal for the time you paid** (taken from the receipt, e.g. 9:32 am → Breakfast), like Add expense does, with a note saying it's a guess. Change it if it wasn't food;
 - transfers are left for you to choose.
 
-Check them, then **Add**, or **×** if it isn't an expense. **Add all ready** confirms every item whose tag came from a shop you've taught it, or that you picked yourself; time-of-day guesses get one tap each, so you see them first.
+Check them, then **Add**, or **×** if it isn't an expense. **Add all ready** confirms every item whose tag came from a shop it remembers, or that you picked yourself; time-of-day guesses get one tap each, so you see them first.
 
 <img src="../public/help/inbox.png" alt="An Inbox item: amount, date, category and tag filled in" width="320">
 
-- **It learns your shops when you ask it to.** The **"Next time, suggest this tag for …"** box starts unticked; tick it for shops you pay often, and their payments arrive already tagged.
+- **It remembers your shops when you ask it to.** Tick **Remember "SHOP" as** (it starts unticked) and choose:
+  - **Food (meal by time)**: the shop is always Food, and the meal still follows when you paid (a mamak at 8am is Breakfast, at 9pm Dinner). This is the default for food.
+  - **Category · tag**, e.g. **Transport · Grab**: always that tag.
+  - **Another category on its own**, e.g. **Shopping (any tag)**: filed under Shopping, and you pick the tag.
+
+  Next time, that shop's payments arrive already sorted. To see, change or forget what it remembers, or add a shop before you've paid there, go to **Settings → Automation → Shops it remembers**. A shop matches when its name contains those words ("GRAB" matches "GRAB* A-1234 KL").
 - **Transfers** (e.g. a DuitNow Transfer to your own bank) are labelled *Transfer*. Moving money between your own accounts isn't spending, so dismiss those.
 - **Already have it?** If an item matches an expense you already have that day, it says so, so you can dismiss it.
 - **original** shows exactly what was read from the screen, with a **Copy** button.
