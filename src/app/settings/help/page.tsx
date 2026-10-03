@@ -129,7 +129,7 @@ const TOPICS: Topic[] = [
     anchor: "11-automation-and-the-inbox",
     points: [
       "1. Settings → Automation → Create token, then copy it (it's shown once).",
-      "2. Tap Add the Shortcut → Get Shortcut → Set Up Shortcut, and paste the token. (No button yet? Use Build it yourself on that page.)",
+      "2. Tap Add the Shortcut → Get Shortcut → Set Up Shortcut, and paste the token. If Add Shortcut doesn't respond, tap Skip Configuration: the token is kept.",
       "3. iPhone Settings → Accessibility → Touch → Back Tap → Double Tap → Log Payment, and turn Show Banner off.",
       "Try it: open a TnG receipt and double-tap the back of your phone. Then confirm it in the Inbox.",
       "Tick \"suggest this tag next time\" and that shop's payments arrive already tagged.",

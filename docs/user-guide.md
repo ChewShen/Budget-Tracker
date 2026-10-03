@@ -190,6 +190,8 @@ After paying with TnG (or anything that shows a receipt), **double-tap the back 
 
 **2. Add the Log Payment Shortcut.** Tap **Add the Shortcut** in step 2 of that page. On your iPhone tap **Get Shortcut**, then **Set Up Shortcut**, and paste your token when it asks.
 
+> **Add Shortcut doesn't respond after pasting?** That's an iPhone bug. Tap **Skip Configuration** instead: the token you pasted is kept. To check, open **Log Payment** in the Shortcuts app; your token should be in the first box.
+
 <img src="../public/help/shortcut-get.png" alt="The Log Payment Shortcut, ready to add" width="240">
 
 *(If there's no Add the Shortcut button yet, open **Build it yourself** on the same page and follow the six steps; it takes about two minutes.)*
