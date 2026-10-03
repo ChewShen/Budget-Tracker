@@ -15,16 +15,18 @@ const MAX_BODY = 8_000; // characters
 const MAX_PENDING = 500; // a runaway automation can't flood the Inbox
 
 const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
+// Errors also carry `message`, which the Shortcut shows as its notification.
+const fail = (error: string, status: number) => NextResponse.json({ ok: false, error, message: `Not added: ${error}` }, { status });
 
 export async function POST(request: NextRequest) {
   const header = request.headers.get("authorization") || "";
   const token = header.startsWith("Bearer ") ? header.slice(7).trim() : request.headers.get("x-api-token")?.trim();
-  if (!token) return NextResponse.json({ error: "Missing token" }, { status: 401 });
+  if (!token) return fail("Missing token. Check the Authorization header is Bearer <token>.", 401);
 
   const db = createAdminClient();
   if (!db) {
     console.error("[ingest] Not run: missing SUPABASE_SERVICE_ROLE_KEY.");
-    return NextResponse.json({ error: "Not set up on this deployment" }, { status: 500 });
+    return fail("Not set up on this deployment.", 500);
   }
 
   const { data: tok } = await db
@@ -35,17 +37,17 @@ export async function POST(request: NextRequest) {
     .maybeSingle();
   if (!tok) {
     console.warn("[ingest] Refused: unknown or revoked token.");
-    return NextResponse.json({ error: "Invalid or revoked token" }, { status: 401 });
+    return fail("Invalid or revoked token. Create a new one in Settings → Automation.", 401);
   }
 
   // Body: JSON fields, or plain text (e.g. text read off a screenshot).
   const raw = await request.text();
-  if (raw.length > MAX_BODY) return NextResponse.json({ error: "Too long" }, { status: 413 });
+  if (raw.length > MAX_BODY) return fail("Too much text sent.", 413);
   let input: { text?: unknown; amount?: unknown; merchant?: unknown; date?: unknown; source?: unknown } = {};
   try {
     input = (request.headers.get("content-type") || "").includes("json") ? JSON.parse(raw || "{}") : { text: raw };
   } catch {
-    return NextResponse.json({ error: "Body isn't valid JSON" }, { status: 400 });
+    return fail("The Shortcut sent invalid JSON.", 400);
   }
   if (typeof input !== "object" || input === null) input = { text: String(input) };
 
@@ -55,8 +57,7 @@ export async function POST(request: NextRequest) {
     .select("id", { count: "exact", head: true })
     .eq("user_id", userId)
     .eq("status", "pending");
-  if ((count ?? 0) >= MAX_PENDING)
-    return NextResponse.json({ error: `Inbox is full (${MAX_PENDING} waiting). Confirm or dismiss some first.` }, { status: 429 });
+  if ((count ?? 0) >= MAX_PENDING) return fail(`Inbox is full (${MAX_PENDING} waiting). Confirm or dismiss some first.`, 429);
 
   const today = todayInMalaysia();
   const captured = parseCapture(input, today);
@@ -81,7 +82,7 @@ export async function POST(request: NextRequest) {
   });
   if (error) {
     console.error("[ingest] Couldn't save:", error.message);
-    return NextResponse.json({ error: "Couldn't save to the Inbox" }, { status: 500 });
+    return fail("Couldn't save to the Inbox. Try again.", 500);
   }
   await db.from("api_tokens").update({ last_used_at: new Date().toISOString() }).eq("id", tok.id);
 
