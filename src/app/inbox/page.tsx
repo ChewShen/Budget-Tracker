@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { format, parseISO } from "date-fns";
-import { Check, ChevronLeft, Inbox, X } from "lucide-react";
+import { Check, ChevronLeft, Copy, Inbox, X } from "lucide-react";
 import { useBudget } from "@/lib/budget-context";
 import { useInbox, type InboxItem } from "@/lib/automation";
 import { categoryLabel } from "@/lib/categories";
-import { merchantKey } from "@/lib/ingest";
+import { merchantKey, parseCapture } from "@/lib/ingest";
 import { cn, formatCurrency } from "@/lib/utils";
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -17,6 +17,19 @@ const SOURCE_LABELS: Record<string, string> = {
   email: "Email",
   bank: "Bank",
 };
+
+// Items keep the text that was read off the screen, so they're read again with the latest rules
+// here: an item captured before a parsing fix (e.g. a logo read as the merchant) fixes itself.
+function reread(item: InboxItem): InboxItem {
+  if (!item.raw_text) return item;
+  const fresh = parseCapture({ text: item.raw_text }, format(new Date(), "yyyy-MM-dd"));
+  return {
+    ...item,
+    merchant: fresh.merchant, // same text, newer rules: trust it even when it finds none
+    amount: item.amount ?? fresh.amount,
+    occurred_on: fresh.date ?? item.occurred_on,
+  };
+}
 
 interface Draft {
   amount: string;
@@ -41,7 +54,7 @@ function InboxRow({
   onConfirm: () => void;
   onDismiss: () => void;
 }) {
-  const { categories, tags } = useBudget();
+  const { categories, tags, showToast } = useBudget();
   const [showRaw, setShowRaw] = useState(false);
   const categoryTags = tags.filter((t) => t.category_id === draft.categoryId);
   const amount = parseFloat(draft.amount);
@@ -76,9 +89,22 @@ function InboxRow({
       </div>
 
       {showRaw && item.raw_text && (
-        <pre className="mt-3 max-h-40 overflow-auto whitespace-pre-wrap rounded-lg bg-secondary/60 p-3 text-xs text-muted-foreground">
-          {item.raw_text}
-        </pre>
+        <div className="mt-3 rounded-lg bg-secondary/60 p-3">
+          <pre className="whitespace-pre-wrap text-xs text-muted-foreground">{item.raw_text}</pre>
+          <button
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(item.raw_text as string);
+                showToast({ tone: "default", message: "Original text copied" });
+              } catch {
+                showToast({ tone: "error", message: "Couldn't copy. Select the text instead." });
+              }
+            }}
+            className="mt-2 inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium transition hover:bg-secondary"
+          >
+            <Copy className="h-3 w-3" /> Copy
+          </button>
+        </div>
       )}
 
       <div className="mt-3 grid grid-cols-2 gap-2">
@@ -173,12 +199,14 @@ function InboxRow({
 export default function InboxPage() {
   const { mode, tags, addTransaction, showToast } = useBudget();
   const isCloud = mode === "cloud";
-  const { items, isLoaded, error, resolve } = useInbox(isCloud);
+  const { items: stored, isLoaded, error, resolve } = useInbox(isCloud);
+  const items = useMemo(() => stored.map(reread), [stored]);
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
 
   // A draft per item, prefilled from what was captured and the suggested tag.
   useEffect(() => {
     setDrafts((prev) => {
+      if (items.every((i) => prev[i.id])) return prev; // nothing new
       const next = { ...prev };
       for (const i of items) {
         if (next[i.id]) continue;
