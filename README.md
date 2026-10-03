@@ -81,6 +81,12 @@ Guest mode never touches the database and stores nothing in your browser, so **n
 
 ---
 
+## 📖 Using the App
+
+The [**User Guide**](docs/user-guide.md) explains every feature step by step: adding expenses, bills and instalments, budgets, goals, savings, reminders, automation with iPhone Shortcuts, and troubleshooting. Inside the app, **Settings → Help** has the short version.
+
+---
+
 ## 🛠️ Tech Stack
 
 - **Frontend & App Framework**: [Next.js 15 (App Router)](https://nextjs.org/) + [React 19](https://react.dev/)
