@@ -48,7 +48,7 @@ Tap **+** (phone) or **Add expense** (computer).
 
 **It picks the meal for you.** Around breakfast, lunch, tea time, dinner and late night, the sheet opens on that meal's tag already selected.
 
-**Which date it starts on.** **Settings → General → Adding expenses**:
+**Which date it starts on.** **Settings → Preferences → Adding expenses**:
 - **Today**: always today.
 - **Same as last entry**: for catching up on past days in order. It stays on the date you last used until that day has a **Dinner** or **Supper** entry, then moves on to the next day (never past today).
 
@@ -180,6 +180,10 @@ Let your iPhone send payments to the app instead of typing them. Everything arri
 - **Siri:** a shortcut that asks for an amount and what it was, named e.g. "Log expense".
 
 **3. Confirm in the Inbox.** Overview shows **"N expenses to confirm"**; tap it (or go to `/inbox`). Each item has the amount, merchant and date filled in where they could be read, and a tag if the merchant is known. Fix anything, then **Add**, or **×** to dismiss. **Add all ready** confirms every complete item. **original** shows exactly what was read.
+
+**Works on both TnG screens:** the success screen right after you pay, and a receipt opened later from your transaction history (it uses the receipt's own date and time). **Transfers** (e.g. DuitNow Transfer to a bank account) are labelled *Transfer*: moving money to your own account isn't spending, so dismiss those; money sent to someone for something you bought, add as usual.
+
+**Accidental double-taps are ignored.** On a screen with no amount (your home screen, a chat), nothing is added and the notification says *"Not added: no amount found on this screen"*. The same receipt sent twice is only added once, even after you've confirmed it; an Apple Pay or Siri entry with the same amount, merchant and date within 10 minutes counts as a repeat. If an Inbox item matches an expense you already have that day, it says so, so you can dismiss it.
 
 **It learns your merchants.** With **"Next time, suggest this tag for …"** ticked, confirming "GRAB → Grab" means the next Grab payment arrives already tagged, even from another branch.
 

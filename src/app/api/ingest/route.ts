@@ -1,7 +1,7 @@
 import { createHash } from "crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { formatCurrency } from "@/lib/utils";
-import { parseCapture, suggestTagId } from "@/lib/ingest";
+import { parseCapture, referenceFromText, suggestTagId } from "@/lib/ingest";
 import { createAdminClient, todayInMalaysia } from "@/lib/push-server";
 
 // Adds a captured expense to the token owner's Inbox (Settings → Automation explains the
@@ -15,16 +15,21 @@ const MAX_BODY = 8_000; // characters
 const MAX_PENDING = 500; // a runaway automation can't flood the Inbox
 
 const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
+// Errors also carry `message`, which the Shortcut shows as its notification.
+const fail = (error: string, status: number) => NextResponse.json({ ok: false, error, message: `Not added: ${error}` }, { status });
+// Nothing wrong, just nothing to add (an accidental double-tap): 200, so the Shortcut doesn't error.
+const skip = (reason: string) => NextResponse.json({ ok: false, skipped: true, message: `Not added: ${reason}` });
+const REPEAT_WINDOW_MS = 10 * 60 * 1000; // same amount, merchant and date sent again within 10 minutes
 
 export async function POST(request: NextRequest) {
   const header = request.headers.get("authorization") || "";
   const token = header.startsWith("Bearer ") ? header.slice(7).trim() : request.headers.get("x-api-token")?.trim();
-  if (!token) return NextResponse.json({ error: "Missing token" }, { status: 401 });
+  if (!token) return fail("Missing token. Check the Authorization header is Bearer <token>.", 401);
 
   const db = createAdminClient();
   if (!db) {
     console.error("[ingest] Not run: missing SUPABASE_SERVICE_ROLE_KEY.");
-    return NextResponse.json({ error: "Not set up on this deployment" }, { status: 500 });
+    return fail("Not set up on this deployment.", 500);
   }
 
   const { data: tok } = await db
@@ -35,17 +40,17 @@ export async function POST(request: NextRequest) {
     .maybeSingle();
   if (!tok) {
     console.warn("[ingest] Refused: unknown or revoked token.");
-    return NextResponse.json({ error: "Invalid or revoked token" }, { status: 401 });
+    return fail("Invalid or revoked token. Create a new one in Settings → Automation.", 401);
   }
 
   // Body: JSON fields, or plain text (e.g. text read off a screenshot).
   const raw = await request.text();
-  if (raw.length > MAX_BODY) return NextResponse.json({ error: "Too long" }, { status: 413 });
+  if (raw.length > MAX_BODY) return fail("Too much text sent.", 413);
   let input: { text?: unknown; amount?: unknown; merchant?: unknown; date?: unknown; source?: unknown } = {};
   try {
     input = (request.headers.get("content-type") || "").includes("json") ? JSON.parse(raw || "{}") : { text: raw };
   } catch {
-    return NextResponse.json({ error: "Body isn't valid JSON" }, { status: 400 });
+    return fail("The Shortcut sent invalid JSON.", 400);
   }
   if (typeof input !== "object" || input === null) input = { text: String(input) };
 
@@ -55,11 +60,40 @@ export async function POST(request: NextRequest) {
     .select("id", { count: "exact", head: true })
     .eq("user_id", userId)
     .eq("status", "pending");
-  if ((count ?? 0) >= MAX_PENDING)
-    return NextResponse.json({ error: `Inbox is full (${MAX_PENDING} waiting). Confirm or dismiss some first.` }, { status: 429 });
+  if ((count ?? 0) >= MAX_PENDING) return fail(`Inbox is full (${MAX_PENDING} waiting). Confirm or dismiss some first.`, 429);
 
   const today = todayInMalaysia();
   const captured = parseCapture(input, today);
+  const occurredOn = captured.date ?? today;
+  const rawText = typeof input.text === "string" ? input.text : "";
+
+  // Accidental double-taps. No amount: not a payment screen (or a zero amount), so nothing to add.
+  if (!captured.amount) return skip("no amount found on this screen.");
+  // The same receipt again: its reference numbers were seen before (even if already confirmed).
+  const reference = rawText ? referenceFromText(rawText) : null;
+  if (reference) {
+    const { data: same, error: refError } = await db
+      .from("inbox_items")
+      .select("status")
+      .eq("user_id", userId)
+      .eq("reference", reference)
+      .limit(1);
+    // (refError: the reference migration hasn't been run yet; the time-window check below still works.)
+    if (!refError && same?.length)
+      return skip(same[0].status === "pending" ? "already in your Inbox." : "you've already handled this one.");
+  }
+  // No reference (Apple Pay, Siri): the same amount, merchant and date a moment ago is a repeat.
+  // (With references, a new one means a new payment, e.g. two RM 10 meals at the same stall.)
+  if (!reference) {
+    const { data: recent } = await db
+      .from("inbox_items")
+      .select("merchant")
+      .eq("user_id", userId)
+      .eq("amount", captured.amount)
+      .eq("occurred_on", occurredOn)
+      .gte("created_at", new Date(Date.now() - REPEAT_WINDOW_MS).toISOString());
+    if (recent?.some((r) => (r.merchant ?? "") === (captured.merchant ?? ""))) return skip("already sent a moment ago.");
+  }
 
   // Suggest a tag from the owner's merchant rules (and file it under that tag's category).
   const { data: rules } = await db.from("merchant_rules").select("pattern, tag_id").eq("user_id", userId);
@@ -69,25 +103,28 @@ export async function POST(request: NextRequest) {
     : { data: null };
 
   const source = typeof input.source === "string" && /^[a-z][a-z0-9_-]{0,19}$/i.test(input.source) ? input.source.toLowerCase() : "shortcut";
-  const { error } = await db.from("inbox_items").insert({
+  const row = {
     user_id: userId,
     source,
-    raw_text: typeof input.text === "string" ? input.text.slice(0, 4000) : null,
+    raw_text: rawText ? rawText.slice(0, 4000) : null,
     amount: captured.amount,
     merchant: captured.merchant,
-    occurred_on: captured.date ?? today,
+    occurred_on: occurredOn,
     suggested_tag_id: tag?.id ?? null,
     suggested_category_id: tag?.category_id ?? null,
-  });
+  };
+  let { error } = await db.from("inbox_items").insert({ ...row, reference });
+  // Before 2026-10-03_inbox_reference.sql there's no reference column: save without it.
+  if (error && ["42703", "PGRST204"].includes(error.code ?? "")) ({ error } = await db.from("inbox_items").insert(row));
   if (error) {
     console.error("[ingest] Couldn't save:", error.message);
-    return NextResponse.json({ error: "Couldn't save to the Inbox" }, { status: 500 });
+    return fail("Couldn't save to the Inbox. Try again.", 500);
   }
   await db.from("api_tokens").update({ last_used_at: new Date().toISOString() }).eq("id", tok.id);
 
   // One line a Shortcut can show as a notification.
   const where = [captured.merchant, tag ? `→ ${tag.name}` : null].filter(Boolean).join(" ");
-  const message = [captured.amount ? formatCurrency(captured.amount) : "Amount not found", where]
+  const message = [formatCurrency(captured.amount), where, captured.isTransfer ? "transfer" : null]
     .filter(Boolean)
     .join(" · ");
   return NextResponse.json({
@@ -95,7 +132,7 @@ export async function POST(request: NextRequest) {
     message: `${message} · added to Inbox`,
     amount: captured.amount,
     merchant: captured.merchant,
-    date: captured.date ?? today,
+    date: occurredOn,
     tag: tag?.name ?? null,
     pending: (count ?? 0) + 1,
   });

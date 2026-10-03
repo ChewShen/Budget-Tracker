@@ -15,6 +15,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.19.1] - 2026-10-03
+
+### Added
+- **Transfers are labelled** in the Inbox, with a hint to dismiss money moved to your own account.
+- An Inbox item says when it **matches an expense you already have** that day ("You already have RM 10.00 on 3 Oct (Food · Lunch)").
+- The Inbox shows an item's **original text in full**, with a **Copy** button.
+
+### Changed
+- **Settings is grouped** under Money, Tracking, Alerts & automation and Account; "General" is now **Preferences**.
+- Inbox items are **read again with the latest rules**, so an item captured before a fix corrects itself.
+
+### Fixed
+- **TnG merchant**: on receipts from your history the DuitNow logo was read as the merchant ("D"); the name now comes from "Payment - NAME" or the Merchant row, and the receipt's own date and time are used.
+- **TnG success screens** (right after paying or transferring) are read too: the payee from "Receiver", skipping rows like Recipient Bank/E-Wallet, Account Number and DuitNow Ref No.
+- **Accidental double-taps**: a screen with no amount isn't added, and the same receipt sent twice (or the same Apple Pay/Siri entry within 10 minutes) is only added once. The notification says why.
+- Shortcut notifications on errors now show the reason instead of nothing.
+
+### Database
+- New migration `scripts/migrations/2026-10-03_inbox_reference.sql`: saves a receipt's reference numbers so it's only added once.
+
+---
+
 ## [0.19.0] - 2026-10-03
 
 ### Added

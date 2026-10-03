@@ -37,7 +37,7 @@ const TOPICS: Topic[] = [
     title: "Which date new expenses start on",
     anchor: "2-adding-expenses",
     points: [
-      "Settings → General → Adding expenses.",
+      "Settings → Preferences → Adding expenses.",
       "Today: always today. Same as last entry: stays on the date you last used until that day has a Dinner or Supper entry, then moves to the next day (never past today).",
     ],
   },
@@ -119,6 +119,8 @@ const TOPICS: Topic[] = [
       "Settings → Automation → Create token (copy it now, it's shown once), then follow the Shortcut steps there.",
       "TnG: after paying, double-tap the back of your iPhone on the success screen. Apple Pay can be sent automatically.",
       "Everything lands in the Inbox to confirm. Tick \"suggest this tag next time\" and that merchant arrives tagged from then on.",
+      "Items labelled Transfer may be money moved to your own account. That isn't spending, so dismiss them.",
+      "Double-tapped by accident? Screens without an amount and receipts already sent aren't added.",
       "Lost your phone? Revoke the token.",
     ],
   },
