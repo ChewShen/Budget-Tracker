@@ -159,6 +159,7 @@ const TOPICS: Topic[] = [
     anchor: "13-your-data-and-privacy",
     points: [
       "Only you see your data; other people using the app can't.",
+      "The database is backed up weekly, encrypted so only whoever runs the app can open it. Settings → Account shows the last backup.",
       "Whoever runs the app can technically see the database. Ask them to delete your account to remove everything.",
     ],
   },
@@ -171,6 +172,7 @@ const TOPICS: Topic[] = [
       "\"Run the latest migrations\": the app was updated but its database wasn't yet. Tell whoever runs it.",
       "Shortcut says \"Missing token\" or \"Invalid or revoked token\": create a new token and paste it into the first box of the Log Payment shortcut (or add the Shortcut again; it asks).",
       "\"No amount found\" on a real receipt: turn Show Banner off in Back Tap; the banner can cover the amount.",
+      "A warning on Overview about a background job: Settings → Account → Background jobs shows which one failed or stopped, and the error. Tell whoever runs the app.",
     ],
   },
 ];

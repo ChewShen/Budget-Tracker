@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { formatCurrency } from "@/lib/utils";
 import { matchRule, parseCapture, referenceFromText, timeFromText } from "@/lib/ingest";
 import { mealForHour } from "@/lib/roles";
+import { logJobRun } from "@/lib/job-log";
 import { createAdminClient, todayInMalaysia } from "@/lib/push-server";
 
 // Adds a captured expense to the token owner's Inbox (Settings → Automation explains the
@@ -180,6 +181,7 @@ export async function POST(request: NextRequest) {
   if (error && ["42703", "PGRST204"].includes(error.code ?? "")) ({ error } = await db.from("inbox_items").insert(row));
   if (error) {
     console.error("[ingest] Couldn't save:", error.message);
+    await logJobRun(db, "ingest", false, error.message, userId);
     return fail("Couldn't save to the Inbox. Try again.", 500);
   }
   await db.from("api_tokens").update({ last_used_at: new Date().toISOString() }).eq("id", tok.id);
