@@ -5,6 +5,7 @@ import { LogOut } from "lucide-react";
 import { useBudget } from "@/lib/budget-context";
 import { useAccountEmail } from "@/lib/account";
 import { createClient } from "@/lib/supabase/client";
+import { JobStatusCard } from "@/components/job-status-card";
 
 const MIN_PASSWORD = 8;
 
@@ -124,6 +125,7 @@ export default function AccountSettingsPage() {
         </button>
       </section>
       <PasswordCard />
+      <JobStatusCard />
     </>
   );
 }

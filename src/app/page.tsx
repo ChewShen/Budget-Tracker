@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Inbox } from "lucide-react";
+import { AlertTriangle, ArrowRight, Inbox } from "lucide-react";
 import { ExportMenu } from "@/components/export-menu";
 import { addMonths, format, getDaysInMonth, parse, subMonths } from "date-fns";
 import { useBudget } from "@/lib/budget-context";
 import { useInbox } from "@/lib/automation";
+import { jobStatuses, jobWarning, recentIngestErrors, useJobRuns } from "@/lib/job-health";
 import { MonthSelector } from "@/components/month-selector";
 import { KpiCards } from "@/components/kpi-cards";
 import { SpendHero } from "@/components/spend-hero";
@@ -60,6 +61,9 @@ export default function DashboardPage() {
   } = useBudget();
   // Expenses sent by Shortcuts, waiting in the Inbox (signed-in accounts only).
   const inbox = useInbox(mode === "cloud");
+  // A background job that failed or stopped running (signed-in accounts only).
+  const jobs = useJobRuns(mode === "cloud");
+  const jobProblem = jobWarning(jobStatuses(jobs.runs, new Date()), recentIngestErrors(jobs.runs, new Date()));
 
   // Filter transactions for currently selected month (YYYY-MM)
   const monthTransactions = transactions.filter((t) =>
@@ -327,6 +331,20 @@ export default function DashboardPage() {
           <ExportMenu />
         </div>
       </div>
+
+      {jobProblem && (
+        <Link
+          href="/settings/account"
+          className="card flex items-center gap-3 border-warning/50 px-4 py-3 transition hover:bg-secondary/40"
+        >
+          <AlertTriangle className="h-4 w-4 shrink-0 text-warning" />
+          <span className="min-w-0 flex-1 text-sm">
+            {jobProblem}
+            <span className="block text-xs text-muted-foreground">See Settings → Account → Background jobs</span>
+          </span>
+          <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+        </Link>
+      )}
 
       {inbox.items.length > 0 && (
         <Link

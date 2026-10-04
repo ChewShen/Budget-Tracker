@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildReminders, DEFAULT_REMINDER_PREFS, type ReminderData, type ReminderPrefs } from "@/lib/reminders";
+import { logJobRun } from "@/lib/job-log";
 import {
   createAdminClient,
   missingServerEnv,
@@ -76,6 +77,7 @@ export async function GET(request: NextRequest) {
   const db = createAdminClient();
   if (missing.length || !db) {
     console.error(`[reminders] Not run: missing ${missing.join(", ")}. Add in Vercel and redeploy.`);
+    if (db) await logJobRun(db, "reminders", false, `Not run: missing ${missing.join(", ")} in Vercel.`);
     return NextResponse.json({ error: `Missing env: ${missing.join(", ")}` }, { status: 500 });
   }
 
@@ -84,6 +86,7 @@ export async function GET(request: NextRequest) {
   if (error) {
     // e.g. "Invalid API key": SUPABASE_SERVICE_ROLE_KEY isn't the project's secret / service_role key.
     console.error("[reminders] Not run: couldn't read push_subscriptions:", error.message);
+    await logJobRun(db, "reminders", false, `Not run: couldn't read devices (${error.message}).`);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
@@ -97,7 +100,7 @@ export async function GET(request: NextRequest) {
     .in("user_id", userIds.length ? userIds : ["00000000-0000-0000-0000-000000000000"]);
 
   // users = accounts with a device; nothingDue = of those, how many had no reminders today.
-  const summary = { date: today, users: userIds.length, nothingDue: 0, sent: 0, skipped: 0, removedDevices: 0 };
+  const summary = { date: today, users: userIds.length, nothingDue: 0, sent: 0, skipped: 0, removedDevices: 0, failedAccounts: 0 };
 
   for (const [userId, devices] of byUser) {
     const row = settings?.find((s) => s.user_id === userId);
@@ -106,7 +109,10 @@ export async function GET(request: NextRequest) {
       : DEFAULT_REMINDER_PREFS;
 
     const data = await loadData(db, userId, today);
-    if (!data) continue;
+    if (!data) {
+      summary.failedAccounts++;
+      continue;
+    }
     const reminders = buildReminders(data, prefs);
     if (!reminders.length) {
       summary.nothingDue++;
@@ -147,5 +153,12 @@ export async function GET(request: NextRequest) {
   await db.from("reminder_log").delete().lt("sent_at", cutoff);
 
   console.log("[reminders] Done:", JSON.stringify(summary));
+  // App-wide, so no counts per account here: just whether every account could be checked.
+  await logJobRun(
+    db,
+    "reminders",
+    summary.failedAccounts === 0,
+    summary.failedAccounts ? `Couldn't load data for ${summary.failedAccounts} account(s); see Vercel logs.` : null
+  );
   return NextResponse.json(summary);
 }
