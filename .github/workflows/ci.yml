@@ -43,3 +43,40 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
           NEXT_TELEMETRY_DISABLED: 1
+
+  # Backup round trip on real Postgres 17: build the database, back it up with scripts/backup.sh,
+  # restore it into an empty database with scripts/restore-backup.sh, and check it all came back.
+  backup-roundtrip:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      source:
+        image: postgres:17
+        env: { POSTGRES_PASSWORD: postgres }
+        ports: ["5432:5432"]
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+      target:
+        image: postgres:17
+        env: { POSTGRES_PASSWORD: postgres }
+        ports: ["5433:5432"]
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install pg_dump 17 and age
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSo /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null
+          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client-17 age >/dev/null
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+
+      - name: Backup round trip
+        run: tests/backup/roundtrip.sh
+        env:
+          SOURCE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+          TARGET_URL: postgresql://postgres:postgres@localhost:5433/postgres

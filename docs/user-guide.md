@@ -268,6 +268,7 @@ A token can only **add** items to *your* Inbox; it can't read anything. If you l
 - The person who runs the app (the database owner) can technically see all data, as with most apps. If you want your account and everything in it removed, ask them: deleting an account deletes all of its data.
 - Guest mode uses made-up data and never touches the database.
 - Automation tokens are stored only as a fingerprint (hash) and can be revoked.
+- The whole database is backed up every week, encrypted so only the person who runs the app can open it (if they've set it up; Settings → Account → Background jobs shows the last backup).
 
 ---
 
@@ -289,5 +290,7 @@ A token can only **add** items to *your* Inbox; it can't read anything. If you l
 **"Not added: no amount found" on a real receipt.** Turn **Show Banner** off in Back Tap (iPhone Settings → Accessibility → Touch → Back Tap): the banner can cover the amount at the top. Make sure the amount is on screen when you double-tap.
 
 **The Inbox got the amount or merchant wrong.** Fix it before adding; tap **original** to see what was read. Payment screens differ, and parsing improves over time.
+
+**Overview says a background job failed or "hasn't run when expected".** Open **Settings → Account → Background jobs**: it shows which one (nightly reminders, auto-add bills, database backup), when it last worked, and the error. Tell whoever runs the app; README → Reminders and README → Backups say how to fix each. "Shortcut payments couldn't be saved" means a double-tap reached the app but wasn't saved: double-tap the receipt again.
 
 **Something's missing from my totals.** Check the month at the top of Overview, and whether the expense was saved (a failed save shows a **Retry** message). Activity → all months, then search, will find it.

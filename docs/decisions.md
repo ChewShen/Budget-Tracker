@@ -101,6 +101,18 @@ Each entry covers what was chosen, why, and what it costs. For what changed and 
 
 ---
 
+### Weekly backups: pg_dump + age in GitHub Actions
+- **Why:** Supabase's free plan gives no backups to download, and the app's only copy was the live database. A scheduled GitHub Actions job (`.github/workflows/backup.yml`) runs `scripts/backup.sh` weekly: `pg_dump` of the public schema (tables, data, policies, functions) and of `auth.users`, so passwords survive a restore.
+- **Encrypted before upload:** The repository is public, and Actions artifacts of a public repository can be downloaded by anyone signed in to GitHub. Each backup is encrypted with [age](https://age-encryption.org) for one public key; the private key stays with the owner, off GitHub. Kept 90 days.
+- **Restore is tested, not assumed:** `tests/backup/roundtrip.sh` runs in CI on two real Postgres 17 containers: build the database from the README and migrations, back it up, restore into an empty one, re-run the migrations, and compare counts, totals, policies, functions, the sign-up trigger and the cron job. This is how the restore script learned that a new project already has the `public` schema and keeps `uuid-ossp` in `extensions`.
+- **What's not in the backup:** the trigger on `auth.users` and the pg_cron schedule live outside `public`; re-running the migrations (safe by design) recreates them, which the round trip checks.
+- **Trade-off:** The database connection string is a GitHub secret with full access. It's only exposed to this workflow (schedule or manual start, never fork PRs), and resetting the database password revokes it.
+
+### Background jobs report to the app (`job_runs`)
+- **Why:** Vercel keeps logs for about an hour, so a nightly job could fail for weeks unnoticed. The reminder route, the pg_cron auto-add (which now catches its own error so the failure is logged rather than rolled back), the backup workflow and failed Shortcut saves write a row to `job_runs`.
+- **Shown where it's noticed:** Settings → Account lists each job's last run; Overview shows a warning when one failed, is late (nightly jobs after 26 hours, the backup after 8 days), or a Shortcut payment couldn't be saved this week. A job that has never run isn't a warning (not set up yet). The rules are pure functions (`src/lib/job-health.ts`), tested.
+- **Privacy:** App-wide rows carry no counts or anyone's data, only ok/failed and an error message; a Shortcut error is visible only to its account.
+
 ## 4. Features
 
 ### Salary and interest maths match the spreadsheet
