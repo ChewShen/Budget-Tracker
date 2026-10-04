@@ -15,6 +15,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.24.0] - 2026-10-04
+
+### Added
+- **Weekly encrypted backups** of the whole database (tables, data, privacy rules, functions and accounts), every Sunday at 2am Malaysia time or on demand (GitHub → Actions → Backup → Run workflow). Each backup is encrypted with the owner's [age](https://age-encryption.org) key before upload, since the repository is public, and kept for 90 days. `scripts/restore-backup.sh` restores into a new, empty Supabase project. Set-up and restore steps: README → Backups.
+- **Restores are tested in CI**: every push backs up a sample database on real Postgres 17, restores it into an empty one, re-runs the migrations and checks everything came back (counts, totals, privacy rules, the new-account trigger, the nightly schedule).
+- **Background jobs in Settings → Account**: when the nightly reminders, the nightly bill auto-add and the weekly backup last ran, and the error when one failed.
+- **A warning on Overview** when a background job failed, missed its run, or a payment from your Shortcut couldn't be saved this week.
+
+### Changed
+- The nightly bill auto-add records each run, and records a failure instead of losing it (migration `2026-10-04_job_runs.sql`).
+- The roadmap pauses new features while the current app is made sturdier.
+
+---
+
 ## [0.23.0] - 2026-10-04
 
 ### Added
