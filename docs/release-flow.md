@@ -74,6 +74,9 @@ npm run build        # Next.js production build verification
 3. ESLint.
 4. Tests (`npm test`); Vercel never runs these.
 5. Production build, with placeholder Supabase values (no secrets in CI).
+6. A separate job, **backup round trip**: two real Postgres 17 containers; build the database, back it up with `scripts/backup.sh`, restore into the empty one with `scripts/restore-backup.sh`, re-run the migrations and compare (`tests/backup/`).
+
+The weekly **Backup** workflow (`.github/workflows/backup.yml`) is separate: it runs on Sundays or by hand, needs the `SUPABASE_DB_URL` secret and `BACKUP_AGE_RECIPIENT` variable (README → Backups), and logs each run in the app.
 
 A failing step shows a red ❌ on the commit and the PR. Don't merge until it's green.
 

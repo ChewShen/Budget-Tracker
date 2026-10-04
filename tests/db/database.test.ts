@@ -255,6 +255,18 @@ describe("privacy between accounts", () => {
   });
 });
 
+describe("job runs", () => {
+  it("shows everyone the app-wide runs but only their own events, and only the server writes", async () => {
+    await db.query("INSERT INTO job_runs (job, ok) VALUES ('reminders', true)");
+    await db.query("INSERT INTO job_runs (job, ok, detail, user_id) VALUES ('ingest', false, 'Couldn''t save', $1)", [owner]);
+    const seen = (who: string) =>
+      asUser(db, who, (tx) => tx.query<{ job: string }>("SELECT job FROM job_runs WHERE job IN ('reminders', 'ingest')").then((r) => r.rows.map((x) => x.job).sort()));
+    expect(await seen(owner)).toEqual(["ingest", "reminders"]);
+    expect(await seen(friend)).toEqual(["reminders"]);
+    await expect(asUser(db, owner, (tx) => tx.query("INSERT INTO job_runs (job, ok) VALUES ('backup', true)"))).rejects.toThrow(/row-level security/);
+  });
+});
+
 describe("merchant rules", () => {
   it("can remember a category on its own, or a tag in that category, but not a tag from another category", async () => {
     await asUser(db, friend, async (tx) => {
@@ -304,6 +316,24 @@ describe("auto-adding monthly bills", () => {
       expect(first.n).toBe(2);
       expect(again.n).toBe(0);
       expect(added.rows.map((r) => r.name)).toEqual(["Netflix", "Spotify"]);
+      const runs = await tx.query<{ ok: boolean }>("SELECT ok FROM job_runs WHERE job = 'auto_bills' ORDER BY id DESC LIMIT 2");
+      expect(runs.rows).toEqual([{ ok: true }, { ok: true }]);
+    });
+  });
+
+  it("logs a failed run instead of losing it", async () => {
+    await rolledBack(db, async (tx) => {
+      // Break the job: a check that every insert fails.
+      await tx.exec("ALTER TABLE transactions ADD CONSTRAINT always_fails CHECK (amount < 0) NOT VALID");
+      await tx.query(
+        `INSERT INTO recurring_sentinel (user_id, tag_id, expected_amount, due_day, auto_log)
+         SELECT $1, id, 10, 1, true FROM tags WHERE user_id = $1 AND name = 'Water'`,
+        [friend]
+      );
+      expect((await one<{ n: number }>(tx, "SELECT public.auto_log_bills() AS n")).n).toBe(0);
+      const run = await one<{ ok: boolean; detail: string }>(tx, "SELECT ok, detail FROM job_runs WHERE job = 'auto_bills' ORDER BY id DESC LIMIT 1");
+      expect(run.ok).toBe(false);
+      expect(run.detail).toMatch(/always_fails/);
     });
   });
 

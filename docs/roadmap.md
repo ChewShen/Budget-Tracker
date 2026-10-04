@@ -5,7 +5,16 @@ When one is picked up, move it to `docs/changelog.md` under the version that shi
 
 ---
 
-## Next up (agreed order; tests shipped in v0.22.0, shops it remembers in v0.23.0)
+## Now: strengthen what's there (agreed 2026-10-04)
+
+New features are paused while the current app is made sturdier, in this order:
+1. ~~**Data safety**: weekly encrypted backups with a tested restore, and background job health in the app~~ (v0.24.0).
+2. **Known rough edges**: bank-app receipt labels ("Payee Name" read as "Name", "Beneficiary Name", "Transfer Successful"), the goal-ownership gap on money set aside, the bill form's save button that can stay greyed out, and the `npm audit` warnings.
+3. **Browser tests (Playwright)** in CI: add an expense, confirm an Inbox item, record balances, edit a bill.
+4. **Shortcut endpoint hardening**: a rate limit per token; security headers (CSP) on the site.
+5. **Clean-up**: Recharts v3; check the August 2026 imported balances, then drop the `monthly_savings` backup table.
+
+## Paused new features (agreed order; tests shipped in v0.22.0, shops it remembers in v0.23.0)
 
 1. **Other income:** log bonuses, side income, refunds and money received, so the savings rate and the untracked-cash check stay right (only the fixed salary counts today). Transfers *in* could later arrive through the Inbox.
 2. **Bank alerts by email:** forward Maybank/CIMB card and DuitNow alert emails to a private address (needs an email-receiving service, e.g. Cloudflare Email Routing → a worker → `/api/ingest`), so card and online spending the TnG double-tap misses lands in the Inbox too.
@@ -35,9 +44,8 @@ When one is picked up, move it to `docs/changelog.md` under the version that shi
 
 ## Robustness
 
-- **Browser tests (Playwright)** of the main flows (add expense, Inbox confirm, record balances), in CI next to the unit and database tests.
-- **Goal ownership on money set aside**: `goal_contributions` checks the owner but not that the goal is yours (the other "points at" checks do). Harmless in practice (another person's goal id is a random UUID you'd never see, and they don't see your rows), but worth a one-line policy for consistency, plus a test case.
-- **Recharts v3**: v2 is deprecated.
+- See "Now: strengthen what's there" at the top for the agreed list (browser tests, the goal-ownership gap, Recharts v3, …).
+- **Goal ownership on money set aside** (detail): `goal_contributions` checks the owner but not that the goal is yours (the other "points at" checks do). Harmless in practice (another person's goal id is a random UUID you'd never see, and they don't see your rows), but worth a one-line policy for consistency, plus a test case.
 
 ## Data housekeeping
 

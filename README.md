@@ -77,6 +77,8 @@ Guest mode never touches the database and stores nothing in your browser, so **n
 - **Multiple accounts**: friends get their own separate data (categories and tags included), starting from a default set. Accounts are added in the Supabase dashboard; each person can change their password in Settings.
 - **Guest mode** with generated demo data, isolated from the database.
 - **Export**: month or all expenses as Excel-friendly CSV, savings balances, or a full JSON backup.
+- **Weekly encrypted backups** of the whole database (GitHub Actions + age), tested by a restore in CI; see [Backups](#6-backups-recommended).
+- **Background job health**: Settings → Account shows when reminders, bill auto-add and backups last ran; Overview warns when one fails or stops.
 - Refined dark theme with a light mode, and layouts that adapt to touch and mouse.
 
 ---
@@ -250,6 +252,7 @@ One-off SQL changes for existing databases live in [`scripts/migrations/`](scrip
 - `2026-10-01_instalments.sql`: instalment plans on monthly bills (number of payments, first payment month, linked goal, price and down payment), owner checks for the linked goal, and the daily auto-add job skipping plans outside their months.
 - `2026-10-03_inbox.sql`: `api_tokens` (hashed personal tokens), `inbox_items` (captured expenses to confirm) and `merchant_rules` (merchant → tag), owner-only, for Settings → Automation and the Inbox. The endpoint `/api/ingest` needs `SUPABASE_SERVICE_ROLE_KEY` (same as reminders).
 - `2026-10-03_inbox_reference.sql`: a `reference` on Inbox items (a receipt's reference numbers), so the same receipt sent twice is only added once.
+- `2026-10-04_job_runs.sql`: `job_runs`, a log of background jobs (nightly reminders, the nightly bill auto-add, weekly backups, Shortcut errors) shown in Settings → Account, with a warning on Overview when one fails or stops running. The auto-add job now logs each run. Its last query runs the auto-add once (adding any bill due today, as tonight's run would).
 - `2026-10-04_merchant_rule_categories.sql`: merchant rules remember a category, with the tag optional ("TEALIVE → Food", the meal still by payment time), for Settings → Automation → Shops it remembers. Existing rules keep their tag and get its category.
 
 ### Adding a friend
@@ -325,6 +328,32 @@ Phone notifications are sent by a daily Vercel Cron job (`vercel.json`, 12:00 UT
 "Send a test" only needs the VAPID keys, so it can work while the nightly job doesn't.
 
 To run the job by hand: `curl -H "Authorization: Bearer $CRON_SECRET" https://<your-app>/api/reminders` (sends anything due, once).
+
+Each run is also logged in the app (`job_runs`, after `2026-10-04_job_runs.sql`): **Settings → Account → Background jobs** shows the last run, and Overview warns if a night fails or is missed.
+
+### 6. Backups (recommended)
+Supabase's free plan has no backups you can download, so a weekly GitHub Actions job ([`.github/workflows/backup.yml`](.github/workflows/backup.yml), Sundays 2am Malaysia time) makes one with [`scripts/backup.sh`](scripts/backup.sh): every table, policy and function, plus the accounts. Because this repository is public (anyone signed in to GitHub can download its Actions files), each backup is **encrypted with [age](https://age-encryption.org) before upload**, for a key that only you hold. CI restores a backup into an empty Postgres on every push ([`tests/backup/roundtrip.sh`](tests/backup/roundtrip.sh)), so a change that would break restoring is caught.
+
+**Set up (once):**
+1. On your Mac: `brew install age`, then `age-keygen -o ~/budget-backup-key.txt`. It prints your **public key** (`age1…`).
+2. Keep `~/budget-backup-key.txt` safe and **somewhere besides this Mac** (a password manager or USB stick). It's the only way to open the backups; it never goes to GitHub.
+3. GitHub → the repository → **Settings → Secrets and variables → Actions**:
+   - **Variables → New repository variable**: `BACKUP_AGE_RECIPIENT` = the `age1…` public key.
+   - **Secrets → New repository secret**: `SUPABASE_DB_URL` = Supabase → **Connect** → **Session pooler** connection string (`postgresql://postgres.<project>:<password>@aws-….pooler.supabase.com:5432/postgres`, with your database password filled in). GitHub's runners need the pooler (IPv4); the direct connection is IPv6 only.
+4. **Actions → Backup → Run workflow**. When it's green, **Settings → Account → Background jobs** shows *Database backup: last ran …*.
+
+`SUPABASE_DB_URL` gives full access to the database, like the service role key. GitHub keeps it encrypted and never gives it to pull requests from forks; the workflow only runs on its schedule or when you start it. To cut it off, reset the database password in Supabase (Project Settings → Database).
+
+**Download and check a backup:** Actions → Backup → a run → **Artifacts** → download and unzip, then
+`age -d -i ~/budget-backup-key.txt budget-backup-YYYY-MM-DD.tar.gz.age | tar -tz` lists `public.sql`, `auth_users.sql` and `README.txt`. Backups are kept for 90 days (about 13).
+
+**Restore** (into a **new, empty** Supabase project; the script refuses a database that already has the app's tables):
+1. Create the project, enable **pg_cron** (Database → Extensions), and install `psql` (`brew install libpq`, then `brew link --force libpq`).
+2. `DB_URL='<new project's session pooler string>' scripts/restore-backup.sh budget-backup-YYYY-MM-DD.tar.gz.age ~/budget-backup-key.txt`
+3. Run every file in [Migrations](#4-migrations) again, in order (they're safe to re-run). This brings back the new-account trigger and the nightly auto-add schedule, which live outside the backed-up schema.
+4. Point Vercel at the new project (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`), turn off sign-ups in its Auth settings, and redeploy. Passwords are kept, so everyone signs in as before.
+
+GitHub pauses scheduled workflows in public repositories after 60 days without a commit. If that happens, Overview warns that the backup is late; re-enable it under Actions → Backup.
 
 ---
 

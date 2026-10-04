@@ -8,6 +8,7 @@ import { NextRequest } from "next/server";
 type Row = Record<string, unknown>;
 const tables: Record<string, Row[]> = {};
 let noReferenceColumn = false; // as before 2026-10-03_inbox_reference.sql
+let inboxBroken = false; // every Inbox insert fails
 
 class Query implements PromiseLike<{ data: unknown; error: unknown; count?: number }> {
   private filters: ((r: Row) => boolean)[] = [];
@@ -55,6 +56,7 @@ class Query implements PromiseLike<{ data: unknown; error: unknown; count?: numb
       if (this.op === "insert" && "reference" in this.payload) return { data: null, error: { code: "PGRST204", message: "no column" } };
       if (this.filters.length && this.op === "select" && this.max === 1) return { data: null, error: { code: "42703", message: "no column" } };
     }
+    if (this.op === "insert" && inboxBroken && this.table === "inbox_items") return { data: null, error: { code: "XX000", message: "database is down" } };
     if (this.op === "insert") {
       rows.push({ id: `row-${rows.length + 1}`, status: "pending", created_at: new Date().toISOString(), ...this.payload });
       return { data: null, error: null };
@@ -112,6 +114,7 @@ function send(body: unknown, headers: Record<string, string> = { "x-api-token": 
 beforeEach(() => {
   for (const k of Object.keys(tables)) delete tables[k];
   noReferenceColumn = false;
+  inboxBroken = false;
   tables.api_tokens = [
     { id: "t1", user_id: USER, token_hash: hash(TOKEN), revoked_at: null },
     { id: "t2", user_id: USER, token_hash: hash(REVOKED), revoked_at: "2026-10-01T00:00:00Z" },
@@ -197,6 +200,15 @@ describe("adding to the Inbox", () => {
     noReferenceColumn = true;
     expect((await send({ text: RECEIPT })).ok).toBe(true);
     expect(tables.inbox_items[0]).not.toHaveProperty("reference");
+  });
+
+  it("logs a failed save for the account, so Settings and Overview can show it", async () => {
+    inboxBroken = true;
+    const res = await send({ text: RECEIPT });
+    expect(res.status).toBe(500);
+    expect(tables.job_runs).toEqual([
+      expect.objectContaining({ job: "ingest", ok: false, user_id: USER, detail: expect.stringContaining("database is down") }),
+    ]);
   });
 
   it("refuses invalid JSON and too much text", async () => {
